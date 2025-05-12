@@ -20,7 +20,7 @@ SAMPLE = [
     "power": 98,
     "acceleration": 0.2,
     "voltage": 62,
-    "updatedAt": "12:05:23 PM"
+    "updatedAt": "2025-05-14T22:36:00Z"
   },
   {
     "key": "42",
@@ -37,7 +37,7 @@ SAMPLE = [
     "power": 102,
     "acceleration": 0.1,
     "voltage": 58.4,
-    "updatedAt": "12:05:24 PM"
+    "updatedAt": "2025-06-12T22:36:00Z"
   },
   {
     "key": "17",
@@ -54,7 +54,7 @@ SAMPLE = [
     "power": 95,
     "acceleration": 0.3,
     "voltage": 42.7,
-    "updatedAt": "12:05:25 PM"
+    "updatedAt": "2025-05-13T22:36:00Z"
   },
   {
     "key": "18",
@@ -71,7 +71,7 @@ SAMPLE = [
     "power": 88,
     "acceleration": 0.4,
     "voltage": 59.4,
-    "updatedAt": "12:05:26 PM"
+    "updatedAt": "2025-05-12T22:40:20Z"
   },
   {
     "key": "1",
@@ -88,7 +88,7 @@ SAMPLE = [
     "power": 105,
     "acceleration": 0.2,
     "voltage": 54.2,
-    "updatedAt": "12:05:27 PM"
+    "updatedAt": "2025-05-12T21:36:00Z"
   },
   {
     "key": "2",
@@ -105,7 +105,7 @@ SAMPLE = [
     "power": 99,
     "acceleration": 0.5,
     "voltage": 55.8,
-    "updatedAt": "12:05:28 PM"
+    "updatedAt": "2025-05-12T22:36:00Z"
   },
   {
     "key": "3",
@@ -122,7 +122,7 @@ SAMPLE = [
     "power": 96,
     "acceleration": 0.3,
     "voltage": 61.7,
-    "updatedAt": "12:05:29 PM"
+    "updatedAt": "2025-05-12T22:36:00Z"
   }
 ]
 

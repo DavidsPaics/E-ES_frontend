@@ -2,7 +2,7 @@ import React from 'react';
 import MainMenu from '@/components/menu';
 import { useEffect } from 'react';
 import axios from 'axios';
-import Battery from '@/components/battery';
+
 const MainPage: React.FC = () => {
     const fetchData = () : void => {
       axios.get('https://izv.svaza.lv/api/car/2/latest').then((response) => {
@@ -32,7 +32,6 @@ const MainPage: React.FC = () => {
 
     {/* Button */}
     <div className="flex items-center mt-16">
-      <Battery voltage={60} />
     </div>
   </div>
 </div>
