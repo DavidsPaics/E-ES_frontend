@@ -23,6 +23,7 @@ const MainPage: React.FC = () => {
      style={{ zIndex: 10 }}
    >
      🏁 Welcome to the Main Page
+     🏁 Welcome to the Main Page
      </header>
 
   <div className="flex p-8 gap-8 items-start">
