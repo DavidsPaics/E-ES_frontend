@@ -1,5 +1,6 @@
 // src/pages/WSTestPage.tsx
 import React, { useEffect, useState, useRef } from 'react';
+import Battery  from '@/components/battery';
 
 const WS_URL = 'ws://localhost:8765';  // ← make sure this matches your server
 
@@ -38,6 +39,7 @@ export const WSTestPage: React.FC = () => {
   return (
     <div style={{ padding: 20, fontFamily: 'sans-serif' }}>
       <h1>React WebSocket Test</h1>
+              <Battery voltage={34} />
       <div><strong>Status:</strong> {status}</div>
       <div style={{
         marginTop: 10,
