@@ -49,7 +49,7 @@ const MainMenu: React.FC = () => {
         { key: 'results',     label: '📈 Results' },
         { key: 'live-data', label: '📊 Live Data' },
         { key: 'test', label: '🧪 Test' },
-        !isAuthenticated && { key: 'login', label: '🔐 Login' },
+
         isAuthenticated && { key: 'admin', label: '⚙️ Admin Panel' },
         isAuthenticated && { key: 'logout', label: '🚪 Logout' },
       ].filter(Boolean) as MenuItem[], // remove nulls

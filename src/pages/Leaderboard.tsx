@@ -5,23 +5,27 @@ import { FullscreenExitOutlined, FullscreenOutlined } from "@ant-design/icons";
 import type { SortOrder } from "antd/es/table/interface";
 import type { TableProps } from "antd";
 import MainMenu from "@/components/menu";
+import PositionChangeIndicator from "@/components/PositionChangeIndicator";
 
+// Extend ApiRecord to include position_change if provided by API
 type ApiRecord = {
   ID: number;
   username: string;
   avatar: string;
   "Category names": string[];
   "Category points": number[];
+  position_change?: number; // optional
 };
 
 type LeaderboardEntry = {
   ID: number;
   avatar?: string;
   username: string;
+  position_change: number;
   [category: string]: number | string | undefined;
 };
 
-const GET_LEADERBOARD = "https://dummyjson.com/c/e578-a7f4-4f12-9c55"; // your endpoint
+const GET_LEADERBOARD = "https://dummyjson.com/c/ef6e-2864-483e-9b18"; // your endpoint
 
 const Leaderboard: React.FC = () => {
   const [data, setData]           = useState<LeaderboardEntry[]>([]);
@@ -43,7 +47,8 @@ const Leaderboard: React.FC = () => {
             ID: rec.ID,
             avatar: rec.avatar,
             username: rec.username,
-          };
+            position_change: rec.position_change ?? 0,
+          } as any;
           rec["Category names"].forEach((cat, i) => {
             entry[cat] = rec["Category points"][i];
           });
@@ -63,7 +68,7 @@ const Leaderboard: React.FC = () => {
   if (error)   return <Alert type="error" message="Error" description={error} />;
 
   const categories = data[0]
-    ? Object.keys(data[0]).filter(k => !["ID","username","avatar"].includes(k))
+    ? Object.keys(data[0]).filter(k => !["ID","username","avatar","position_change"].includes(k))
     : [];
 
   const columns: TableProps<LeaderboardEntry>["columns"] = [
@@ -86,12 +91,18 @@ const Leaderboard: React.FC = () => {
       dataIndex: "username",
       key: "username",
       sorter: (a, b) => String(a.username).localeCompare(String(b.username)),
+      render: (text, record) => (
+        <div className="flex items-center space-x-2">
+          <span>{text}</span>
+          <PositionChangeIndicator position_change={record.position_change} />
+        </div>
+      ),
     },
     ...categories.map(cat => ({
       title: cat,
       dataIndex: cat,
       key: cat,
-      sorter: (a: { [x: string]: any; }, b: { [x: string]: any; }) => Number(a[cat] || 0) - Number(b[cat] || 0),
+      sorter: (a: any, b: any) => Number(a[cat] || 0) - Number(b[cat] || 0),
     })),
     {
       title: "Total Points",
@@ -108,24 +119,24 @@ const Leaderboard: React.FC = () => {
   // Fullscreen table overlay
   if (expanded) {
     return (
-<div className="min-h-screen flex-1 flex-col pb-32 fixed inset-1 overflow-auto">
-  <div className="flex justify-end mb-2">
-    <Button
-      icon={<FullscreenExitOutlined />}
-      onClick={() => setExpanded(false)}
-      style={{ background: "transparent", border: "none" }}
-    />
-  </div>
+      <div className="min-h-screen flex-1 flex-col pb-32 fixed inset-1 overflow-auto">
+        <div className="flex justify-end mb-2">
+          <Button
+            icon={<FullscreenExitOutlined />}
+            onClick={() => setExpanded(false)}
+            style={{ background: "transparent", border: "none" }}
+          />
+        </div>
 
-  <Table<LeaderboardEntry>
-    dataSource={data}
-    columns={columns}
-    rowKey="ID"
-    pagination={false}
-    size="middle"
-    scroll={{ y: '100%' }}
-  />
-</div>
+        <Table<LeaderboardEntry>
+          dataSource={data}
+          columns={columns}
+          rowKey="ID"
+          pagination={false}
+          size="middle"
+          scroll={{ y: '100%' }}
+        />
+      </div>
     );
   }
 
@@ -145,7 +156,7 @@ const Leaderboard: React.FC = () => {
           <MainMenu />
         </div>
         <div className="flex-1 p-4">
-          <div className="bg-white/30 backdrop-blur-md p-6 rounded-xl shadow-lg ">
+          <div className="bg-white/30 backdrop-blur-md p-6 rounded-xl shadow-lg relative">
             <Table<LeaderboardEntry>
               dataSource={data}
               columns={columns}
@@ -155,11 +166,10 @@ const Leaderboard: React.FC = () => {
             />
             <div className="absolute right-0 top-0">
               <Button
-            icon={<FullscreenOutlined />}
-            onClick={() => setExpanded(true)}
-            style={{ background: "transparent", border: "none" }}
-              >
-              </Button>
+                icon={<FullscreenOutlined />}
+                onClick={() => setExpanded(true)}
+                style={{ background: "transparent", border: "none" }}
+              />
             </div>
           </div>
         </div>
@@ -167,6 +177,5 @@ const Leaderboard: React.FC = () => {
     </div>
   );
 };
-
 
 export default Leaderboard;
