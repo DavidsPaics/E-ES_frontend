@@ -1,78 +1,37 @@
-// src/pages/AdminPanel.tsx
+// src/pages/MainRace.tsx
 import React, { useEffect, useState } from "react";
 import {
   Table,
   Button,
   Select,
   Modal,
-  Input,
-  Form,
   message,
   Avatar,
-  Dropdown,
-  Upload,
-  type MenuProps,
+  Checkbox,
 } from "antd";
-import { UploadOutlined } from "@ant-design/icons";
 import MainMenu from "@/components/menu";
 import dayjs from "dayjs";
-import { useNavigate } from "react-router-dom";
 import '@ant-design/v5-patch-for-react-19';
 
-type ApiRaceConfig = {
-  RaceName: string;
-  Length: number;
-  Coef: number;
-  SortBy: string;
-  Distribution: number[];
-};
-
-type CompetitorBase = {
+type Competitor = {
   id: number;
   username: string;
-  U: number;
-  I: number;
-  m: number;
   avatar?: string;
+  startedAt?: string;   // ISO timestamp when this competitor’s timer was started
+  finishedAt?: string;  // “MM:SS.CS” string when competitor finished
 };
-type Competitor = CompetitorBase & { finishedAt?: string };
 
-const GET_COMPETITORS = "https://dummyjson.com/c/b6c3-8fa1-416b-9d7b";
-const POST_COMPETITORS = "https://dummyjson.com/c/ee3d-a8c5-49b9-b8e5";
-const GET_RACES = "https://dummyjson.com/c/0ed1-4826-4920-9b90";
-const UPLOAD_AVATAR  = "https://dummyjson.com/c/cd9f-e481-489e-9d62";
-const POST_START_RACE    = "https://dummyjson.com/c/2fa2-d909-402e-8ea2";
+const GET_COMPETITORS = "https://izv.svaza.lv/api/parameters";
+const POST_START_RACE = "https://dummyjson.com/c/2fa2-d909-402e-8ea2";
+const POST_FINISH = "https://dummyjson.com/c/151b-a42c-4383-8b61";
 
-const POST_FINISH       = "https://dummyjson.com/c/151b-a42c-4383-8b61";
-const POST_END_RACE     = "https://dummyjson.com/c/08e3-faaa-400d-8cd2";
-
-async function uploadAvatar(file: File): Promise<string> {
-  const form = new FormData();
-  form.append("avatar", file);
-  const res = await fetch(UPLOAD_AVATAR, { method: "POST", body: form });
-  if (!res.ok) throw new Error(`Upload failed (${res.status})`);
-  const { avatarUrl } = (await res.json()) as { avatarUrl: string };
-  return avatarUrl;
-}
-
-const AdminPanel: React.FC = () => {
+const MainRace: React.FC = () => {
   const [competitors, setCompetitors] = useState<Competitor[]>([]);
-  const [races, setRaces]             = useState<string[]>([]);
-  const [selectedRace, setSelectedRace] = useState<string>();
-  const [raceStarted, setRaceStarted]   = useState(false);
-  const [startTime, setStartTime]       = useState<Date | null>(null);
-  const [elapsed, setElapsed]           = useState("00:00:00.00");
-  const [countdown, setCountdown]       = useState<number | null>(null);
-  const [pendingConfirm, setPendingConfirm] = useState<number | null>(null);
-
-  const [addVisible, setAddVisible]   = useState(false);
-  const [addForm]   = Form.useForm<CompetitorBase>();
-
-  const [editVisible, setEditVisible] = useState(false);
-  const [editing, setEditing]         = useState<Competitor | null>(null);
-  const [editForm] = Form.useForm<CompetitorBase>();
-
-  const navigate = useNavigate();
+  const [races] = useState<string[]>(["1", "2", "3"]);
+  const [selectedLap, setSelectedLap] = useState<string>();
+  const [pendingFinish, setPendingFinish] = useState<number | null>(null);
+  const [tick, setTick] = useState(Date.now());
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
 
   // fetch competitors
   const fetchCompetitors = async () => {
@@ -85,390 +44,238 @@ const AdminPanel: React.FC = () => {
     }
   };
 
-  // fetch races
-  const fetchRaces = async () => {
-    try {
-      const res = await fetch(GET_RACES);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const raw = (await res.json()) as ApiRaceConfig[];
-      setRaces(raw.map(r => r.RaceName).filter(r => !!r));
-    } catch (err: any) {
-      message.error("Failed to load races: " + err.message);
-    }
-  };
-
-  // save competitors
-  const handleUpdate = async () => {
-    try {
-      const payload = competitors.map(({ id, username, U, I, m, avatar }) => ({
-        id, username, U, I, m, avatar
-      }));
-      console.log("POST competitors payload:", payload);
-      const res = await fetch(POST_COMPETITORS, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      message.success("Data saved");
-    } catch (err: any) {
-      message.error("Save failed: " + err.message);
-    }
-  };
-
   useEffect(() => {
     fetchCompetitors();
-    fetchRaces();
   }, []);
 
-  // live timer
+  // update tick for per-competitor timers
   useEffect(() => {
-    let t: NodeJS.Timeout;
-    if (raceStarted && startTime) {
-      t = setInterval(() => {
-        const diff = dayjs().diff(startTime);
-        const h = String(Math.floor(diff / 3600000)).padStart(2, "0");
-        const m = String(Math.floor((diff % 3600000) / 60000)).padStart(2, "0");
-        const s = String(Math.floor((diff % 60000) / 1000)).padStart(2, "0");
-        const cs = String(Math.floor((diff % 1000) / 10)).padStart(2, "0");
-        setElapsed(`${h}:${m}:${s}.${cs}`);
-      }, 100);
-    }
-    return () => clearInterval(t);
-  }, [raceStarted, startTime]);
+    const timer = setInterval(() => setTick(Date.now()), 100);
+    return () => clearInterval(timer);
+  }, []);
 
-  // handle finish click / confirm
+  // batch start for selected competitors
+  const handleBatchStart = async () => {
+    if (!selectedLap) {
+      message.warning("Izvēlieties apli pirms startēšanas");
+      return;
+    }
+    if (selectedRowKeys.length === 0) {
+      message.warning("Atlasiet vismaz vienu sacensētāju");
+      return;
+    }
+    const lapName = `race${selectedLap}`;
+    // Confirm before starting
+    Modal.confirm({
+      title: `Startēt atlasītos sacensētājus aplī "${lapName}"?`,
+      onOk: async () => {
+        const toStart = selectedRowKeys as number[];
+        // Update locally first
+        setCompetitors(prev =>
+          prev.map(c =>
+            toStart.includes(c.id)
+              ? { ...c, startedAt: new Date().toISOString(), finishedAt: undefined }
+              : c
+          )
+        );
+        // POST start for each
+        for (const id of toStart) {
+          try {
+            const payload = { raceName: lapName, ID: id };
+            const res = await fetch(POST_START_RACE, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+            if (!res.ok) throw new Error(`Start failed (${res.status})`);
+            message.success(`Sacensētājs ${id} startēts`);
+          } catch (e: any) {
+            message.error(`Startēšana neizdevās (${id}): ` + e.message);
+          }
+        }
+        // Clear selection after start
+        setSelectedRowKeys([]);
+      },
+    });
+  };
+
+  // handle competitor finish (with confirmation)
   const handleFinishClick = (id: number) => {
-    if (pendingConfirm === id) {
+    if (pendingFinish === id) {
       performFinish(id);
-      setPendingConfirm(null);
+      setPendingFinish(null);
     } else {
-      setPendingConfirm(id);
+      setPendingFinish(id);
       setTimeout(() => {
-        if (pendingConfirm === id) setPendingConfirm(null);
+        if (pendingFinish === id) setPendingFinish(null);
       }, 3000);
     }
   };
 
-  // perform finish: update state + POST
   const performFinish = async (id: number) => {
-    if (!raceStarted || !startTime) return;
+    const competitor = competitors.find(c => c.id === id);
+    if (!competitor?.startedAt) return;
+    const startTime = dayjs(competitor.startedAt);
+    const diff = dayjs().diff(startTime);
+    const mm = String(Math.floor((diff % 3600000) / 60000)).padStart(2, "0");
+    const ss = String(Math.floor((diff % 60000) / 1000)).padStart(2, "0");
+    const cs = String(Math.floor((diff % 1000) / 10)).padStart(2, "0");
+    const finishString = `${mm}:${ss}.${cs}`;
+
     // update locally
     setCompetitors(prev =>
       prev.map(c =>
-        c.id === id && !c.finishedAt
-          ? {
-              ...c,
-              finishedAt: (() => {
-                const diff = dayjs().diff(startTime);
-                const mm = String(Math.floor((diff%3600000)/60000)).padStart(2,"0");
-                const ss = String(Math.floor((diff%60000)/1000)).padStart(2,"0");
-                const cs = String(Math.floor((diff%1000)/10)).padStart(2,"0");
-                return `${mm}:${ss}.${cs}`;
-              })(),
-            }
+        c.id === id
+          ? { ...c, finishedAt: finishString }
           : c
       )
     );
-    // POST finish
+
+    // POST finish with { raceName, ID }
+    if (!selectedLap) {
+      message.error("Nav izvēlēts aplis POST pabeigšanai");
+      return;
+    }
+    const lapName = `race${selectedLap}`;
     try {
-      const payload = { ID: id };
-      console.log("POST finish payload:", payload);
+      const payload = { raceName: lapName, ID: id };
       const res = await fetch(POST_FINISH, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error(`Finish failed (${res.status})`);
-      message.success(`Competitor ${id} finished posted`);
+      message.success(`Sacensētājs ${id} finišēja`);
     } catch (e: any) {
-      message.error("Finish post failed: " + e.message);
+      message.error("Finiša paziņošana neizdevās: " + e.message);
     }
   };
 
-  // confirm start: just set countdown
-  const confirmStart = () => {
-    if (!selectedRace) return message.warning("Select a race");
-    Modal.confirm({ title: `Start "${selectedRace}"?`, onOk: () => setCountdown(3) });
-  };
-
-  // countdown → POST start → local start
-  useEffect(() => {
-    if (countdown == null) return;
-    if (countdown > 0) {
-      const t = setTimeout(() => setCountdown(countdown - 1), 1000);
-      return () => clearTimeout(t);
-    }
-    (async () => {
-      try {
-        const payload = { raceName: selectedRace };
-        console.log("POST start payload:", payload);
-        const res = await fetch(POST_START_RACE, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) throw new Error(`Start failed (${res.status})`);
-        message.success(`Start posted`);
-      } catch (e: any) {
-        message.error("Start post failed: " + e.message);
-      }
-      // then local
-      setCountdown(null);
-      setRaceStarted(true);
-      setStartTime(new Date());
-      setCompetitors(prev => prev.map(c => ({ ...c, finishedAt: undefined })));
-    })();
-  }, [countdown, selectedRace]);
-
-  // handle end: POST then stop
-  const handleEnd = async () => {
-    if (!selectedRace) return;
-    try {
-      const payload = { raceName: selectedRace };
-      console.log("POST end payload:", payload);
-      const res = await fetch(POST_END_RACE, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error(`End failed (${res.status})`);
-      message.success(`End posted`);
-    } catch (e: any) {
-      message.error("End post failed: " + e.message);
-    }
-    setRaceStarted(false);
-  };
-
-  // add competitor
-  const handleAddOk = () => {
-    addForm.validateFields().then(vals => {
-      const nextId = Math.max(0, ...competitors.map(c => c.id)) + 1;
-      setCompetitors(prev => [...prev, { ...vals, id: nextId }]);
-      addForm.resetFields();
-      setAddVisible(false);
-    });
-  };
-
-  // edit competitor + delete
-  const handleEditOk = () => {
-    editForm.validateFields().then(vals => {
-      setCompetitors(prev =>
-        prev.map(c => c.id === editing?.id ? { ...c, ...vals } : c)
-      );
-      setEditVisible(false);
-    });
-  };
-  const handleDelete = (id: number) => {
-    console.log("Deleting competitor:", id);
-    setCompetitors(prev => prev.filter(c => c.id !== id));
-    setEditVisible(false);
-  };
-
-  // avatar menu
-  const avatarMenuItems = (rec: Competitor): MenuProps["items"] => [
-    {
-      key: "edit",
-      label: "Edit…",
-      onClick: () => {
-        setEditing(rec);
-        editForm.setFieldsValue(rec);
-        setEditVisible(true);
-      },
+  // row selection configuration
+  const rowSelection = {
+    selectedRowKeys,
+    onChange: (newKeys: React.Key[]) => {
+      setSelectedRowKeys(newKeys);
     },
-    {
-      key: "upload",
-      label: (
-        <Upload
-          showUploadList={false}
-          customRequest={async ({ file, onSuccess, onError }) => {
-            try {
-              const url = await uploadAvatar(file as File);
-              console.log("Uploaded avatar URL:", url);
-              setCompetitors(prev =>
-                prev.map(c => c.id === rec.id ? { ...c, avatar: url } : c)
-              );
-              onSuccess?.({}, new XMLHttpRequest());
-            } catch (e: any) {
-              message.error("Upload failed: " + e.message);
-              onError?.(e);
-            }
-          }}
-        >
-          <span><UploadOutlined /> Upload Photo…</span>
-        </Upload>
-      ),
-    },
-  ];
+  };
 
-  // table columns
+  // table columns, including per-competitor timer and finish button
   const tableColumns = [
+    
     {
       title: "Avatar",
       dataIndex: "avatar",
       key: "avatar",
       width: 64,
-      render: (_: any, rec: Competitor) => (
-        <Dropdown menu={{ items: avatarMenuItems(rec) }} trigger={["click"]}>
-          <Avatar src={rec.avatar} size={48} style={{ cursor: "pointer" }} />
-        </Dropdown>
-      ),
+      render: (_: any, rec: Competitor) => <Avatar src={rec.avatar} size={48} />,
     },
     {
       title: "Username",
       dataIndex: "username",
       key: "username",
-      sorter: (a: { username: string; }, b: { username: any; }) => a.username.localeCompare(b.username),
+      sorter: (a: Competitor, b: Competitor) => a.username.localeCompare(b.username),
     },
     {
       title: "ID",
       dataIndex: "id",
       key: "id",
       width: 70,
-      sorter: (a: { id: number; }, b: { id: number; }) => a.id - b.id,
+      sorter: (a: Competitor, b: Competitor) => a.id - b.id,
     },
-    { title: "U", dataIndex: "U", key: "U", width: 60 },
-    { title: "I", dataIndex: "I", key: "I", width: 60 },
-    { title: "m", dataIndex: "m", key: "m", width: 60 },
+    {
+      title: "Time",
+      key: "time",
+      width: 120,
+      render: (_: any, rec: Competitor) => {
+        if (rec.finishedAt) {
+          return <span style={{ color: "#40a9ff", fontWeight: "bold" }}>{rec.finishedAt}</span>;
+        }
+        if (rec.startedAt) {
+          const elapsedMs = dayjs(tick).diff(dayjs(rec.startedAt));
+          const mm = String(Math.floor((elapsedMs % 3600000) / 60000)).padStart(2, "0");
+          const ss = String(Math.floor((elapsedMs % 60000) / 1000)).padStart(2, "0");
+          const cs = String(Math.floor((elapsedMs % 1000) / 10)).padStart(2, "0");
+          return `${mm}:${ss}.${cs}`;
+        }
+        return "--:--.--";
+      },
+    },
     {
       title: "Action",
       key: "action",
       width: 140,
       align: "center" as const,
       render: (_: any, rec: Competitor) => {
-        const isPending = pendingConfirm === rec.id;
-        const label = rec.finishedAt
-          ? `Finished ${rec.finishedAt}`
-          : isPending
-            ? "Confirm Finish"
-            : "FINISH";
-        return (
-          <Button
-            type={isPending ? "default" : "primary"}
-            danger={!isPending}
-            disabled={!raceStarted || !!rec.finishedAt}
-            onClick={() => handleFinishClick(rec.id)}
-          >
-            {label}
-          </Button>
-        );
+        if (rec.finishedAt) {
+          return <span style={{ color: "#40a9ff", fontWeight: "bold" }}>Finished</span>;
+        }
+        if (rec.startedAt) {
+          const isPending = pendingFinish === rec.id;
+          const label = isPending ? "Confirm Finish" : "FINISH";
+          return (
+            <Button
+              type={isPending ? "default" : "primary"}
+              danger={!isPending}
+              onClick={() => handleFinishClick(rec.id)}
+            >
+              {label}
+            </Button>
+          );
+        }
+        // Not started: no individual start button (batch start only)
+        return null;
       },
     },
   ];
 
   return (
     <div className="min-h-screen flex flex-col">
-      {countdown != null && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <span className="text-white text-9xl">{countdown}</span>
-        </div>
-      )}
-
       <header className="fixed top-0 left-0 right-0 w-full p-4 bg-white/20 backdrop-blur text-xl font-bold text-center text-white z-10">
-        ⚙️ Admin Panel
+        ⚙️ Main Race Control Panel
       </header>
 
       <div className="flex flex-1 mt-16 p-8 gap-x-12">
-        <div className="p-4"><MainMenu /></div>
+        <div className="p-4">
+          <MainMenu />
+        </div>
 
         <div className="flex flex-col gap-y-4 w-[600px]">
-          <h2 className="text-white text-xl font-semibold">Parameters</h2>
+          <h2 className="text-white text-xl font-semibold">Competitors</h2>
           <Table
             dataSource={competitors}
             columns={tableColumns}
             rowKey="id"
             pagination={false}
             size="middle"
+            rowSelection={rowSelection}
           />
-          <div className="flex gap-4">
-            <Button type="primary" onClick={() => setAddVisible(true)}>Add user</Button>
-            <Button onClick={handleUpdate}>Update data</Button>
-          </div>
         </div>
 
         <div className="flex flex-col items-center ml-auto gap-y-4">
-          <span className="text-white text-lg">Choose the race</span>
+          <span className="text-white text-lg">Izvēlieties apli</span>
           <Select<string>
-            placeholder="Race name"
+            placeholder="Lap"
             style={{ width: 220 }}
-            value={selectedRace}
-            onChange={setSelectedRace}
-            disabled={raceStarted || countdown != null}
+            value={selectedLap}
+            onChange={setSelectedLap}
           >
             {races.map(r => (
-              <Select.Option key={r} value={r}>{r}</Select.Option>
+              <Select.Option key={r} value={r}>
+                {r}
+              </Select.Option>
             ))}
           </Select>
           <Button
             type="primary"
-            onClick={confirmStart}
-            disabled={!selectedRace || raceStarted || countdown != null}
+            onClick={handleBatchStart}
+            disabled={!selectedLap || selectedRowKeys.length === 0}
           >
-            START
+            START SELECTED
           </Button>
-          <Button danger onClick={handleEnd} disabled={!raceStarted}>
-            END RACE
-          </Button>
-          <Button onClick={() => navigate("/race-config")}>Configure Race</Button>
-          <div className="text-white text-2xl font-bold text-center">
-            Time elapsed:<br />{elapsed}
-          </div>
         </div>
       </div>
-
-      {/* Add Competitor Modal */}
-      <Modal title="Add Competitor" open={addVisible} onOk={handleAddOk} onCancel={() => setAddVisible(false)}>
-        <Form layout="vertical" form={addForm}>
-          <Form.Item name="username" label="Username" rules={[{ required: true }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item name="U" label="U" initialValue={0}>
-            <Input type="number" step="0.01" />
-          </Form.Item>
-          <Form.Item name="I" label="I" initialValue={0}>
-            <Input type="number" step="0.001" />
-          </Form.Item>
-          <Form.Item name="m" label="m" initialValue={0}>
-            <Input type="number" />
-          </Form.Item>
-        </Form>
-      </Modal>
-
-      {/* Edit Competitor Modal */}
-      <Modal
-        title="Edit Competitor"
-        open={editVisible}
-        onOk={handleEditOk}
-        onCancel={() => setEditVisible(false)}
-        footer={[
-          <Button key="delete" danger onClick={() => handleDelete(editing!.id)}>
-            Delete User
-          </Button>,
-          <Button key="cancel" onClick={() => setEditVisible(false)}>
-            Cancel
-          </Button>,
-          <Button key="save" type="primary" onClick={handleEditOk}>
-            Save
-          </Button>,
-        ]}
-      >
-        <Form layout="vertical" form={editForm}>
-          <Form.Item name="username" label="Username" rules={[{ required: true }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item name="U" label="U" initialValue={0}>
-            <Input type="number" step="0.01" />
-          </Form.Item>
-          <Form.Item name="I" label="I" initialValue={0}>
-            <Input type="number" step="0.001" />
-          </Form.Item>
-          <Form.Item name="m" label="m" initialValue={0}>
-            <Input type="number" />
-          </Form.Item>
-        </Form>
-      </Modal>
     </div>
   );
 };
 
-export default AdminPanel;
+export default MainRace;

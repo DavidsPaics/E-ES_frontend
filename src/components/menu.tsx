@@ -1,6 +1,17 @@
 import React from 'react';
 import type { MenuProps } from 'antd';
 import { Menu } from 'antd';
+import ResultsPage from "@/pages/ResultsPage";
+import LiveDataPage from "@/pages/LiveDataPage";
+import WSTestPage from "@/pages/Test";
+import EkoRace from "@/pages/Categories/EkoRace";
+import MainRace from "@/pages/Categories/MainRace";
+import ShuttleRun from "@/pages/Categories/ShuttleRun";
+import SteeringTest from "@/pages/Categories/SteeringTest";
+import DragRace from "@/pages/Categories/DragRace";
+import BrakingTest from "@/pages/Categories/BrakingTest";
+import ScoringPage from "@/pages/ScoringPage";
+
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/authentification/AuthContext';
 type MenuItem = Required<MenuProps>['items'][number];
@@ -35,6 +46,27 @@ const MainMenu: React.FC = () => {
       case 'test':
         navigate('/test');
         break;
+      case 'eko-race':
+        navigate('/Category/EkoRace');
+        break;
+      case 'main-race':
+        navigate('/Category/MainRace');
+        break;
+      case 'shuttle-run':
+        navigate('/Category/ShuttleRun');
+        break;
+      case 'steering-test':
+        navigate('/Category/SteeringTest');
+        break;
+      case 'drag-race':
+        navigate('/Category/DragRace');
+        break;
+      case 'braking-test':
+        navigate('/Category/BrakingTest');
+        break;
+      case 'scoring':
+        navigate('/scoring');
+        break;
     }
   };
 
@@ -49,7 +81,14 @@ const MainMenu: React.FC = () => {
         { key: 'results',     label: '📈 Results' },
         { key: 'live-data', label: '📊 Live Data' },
         { key: 'test', label: '🧪 Test' },
-
+        { key: 'login', label: '🔑 Login', disabled: isAuthenticated },
+        { key: 'eko-race', label: '🏁 Eko Race' },
+        { key: 'main-race', label: '🏁 Main Race' },
+        { key: 'shuttle-run', label: '🏁 Shuttle Run' },
+        { key: 'steering-test', label: '🏁 Steering Test' },
+        { key: 'drag-race', label: '🏁 Drag Race' },
+        { key: 'braking-test', label: '🏁 Braking Test' },
+        { key: 'scoring', label: '📊 Scoring' },
         isAuthenticated && { key: 'admin', label: '⚙️ Admin Panel' },
         isAuthenticated && { key: 'logout', label: '🚪 Logout' },
       ].filter(Boolean) as MenuItem[], // remove nulls

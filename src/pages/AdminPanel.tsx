@@ -1,4 +1,5 @@
 // src/pages/AdminPanel.tsx
+
 import React, { useEffect, useState } from "react";
 import {
   Table,
@@ -33,16 +34,16 @@ type CompetitorBase = {
   U: number;
   I: number;
   m: number;
+  ageGroup: string;
   avatar?: string;
 };
 type Competitor = CompetitorBase & { finishedAt?: string };
 
-const GET_COMPETITORS = "https://izv.svaza.lv/api/parameters";
+const GET_COMPETITORS = "https://dummyjson.com/c/2ef6-cdb5-4f62-b63f";
 const POST_COMPETITORS = "https://izv.svaza.lv/api/parameters";
 const GET_RACES = "https://dummyjson.com/c/0ed1-4826-4920-9b90";
 const UPLOAD_AVATAR  = "https://dummyjson.com/c/cd9f-e481-489e-9d62";
 const POST_START_RACE    = "https://dummyjson.com/c/2fa2-d909-402e-8ea2";
-
 const POST_FINISH       = "https://dummyjson.com/c/151b-a42c-4383-8b61";
 const POST_END_RACE     = "https://dummyjson.com/c/08e3-faaa-400d-8cd2";
 
@@ -97,11 +98,17 @@ const AdminPanel: React.FC = () => {
     }
   };
 
-  // save competitors
+  // save competitors (including ageGroup)
   const handleUpdate = async () => {
     try {
-      const payload = competitors.map(({ id, username, U, I, m, avatar }) => ({
-        id, username, U, I, m, avatar
+      const payload = competitors.map(({ id, username, U, I, m, ageGroup, avatar }) => ({
+        id,
+        username,
+        U,
+        I,
+        m,
+        ageGroup,
+        avatar,
       }));
       console.log("POST competitors payload:", payload);
       const res = await fetch(POST_COMPETITORS, {
@@ -150,10 +157,9 @@ const AdminPanel: React.FC = () => {
     }
   };
 
-  // perform finish: update state + POST
+  // perform finish
   const performFinish = async (id: number) => {
     if (!raceStarted || !startTime) return;
-    // update locally
     setCompetitors(prev =>
       prev.map(c =>
         c.id === id && !c.finishedAt
@@ -161,16 +167,15 @@ const AdminPanel: React.FC = () => {
               ...c,
               finishedAt: (() => {
                 const diff = dayjs().diff(startTime);
-                const mm = String(Math.floor((diff%3600000)/60000)).padStart(2,"0");
-                const ss = String(Math.floor((diff%60000)/1000)).padStart(2,"0");
-                const cs = String(Math.floor((diff%1000)/10)).padStart(2,"0");
+                const mm = String(Math.floor((diff % 3600000) / 60000)).padStart(2, "0");
+                const ss = String(Math.floor((diff % 60000) / 1000)).padStart(2, "0");
+                const cs = String(Math.floor((diff % 1000) / 10)).padStart(2, "0");
                 return `${mm}:${ss}.${cs}`;
               })(),
             }
           : c
       )
     );
-    // POST finish
     try {
       const payload = { ID: id };
       console.log("POST finish payload:", payload);
@@ -186,7 +191,7 @@ const AdminPanel: React.FC = () => {
     }
   };
 
-  // confirm start: just set countdown
+  // confirm start
   const confirmStart = () => {
     if (!selectedRace) return message.warning("Select a race");
     Modal.confirm({ title: `Start "${selectedRace}"?`, onOk: () => setCountdown(3) });
@@ -213,7 +218,6 @@ const AdminPanel: React.FC = () => {
       } catch (e: any) {
         message.error("Start post failed: " + e.message);
       }
-      // then local
       setCountdown(null);
       setRaceStarted(true);
       setStartTime(new Date());
@@ -221,7 +225,7 @@ const AdminPanel: React.FC = () => {
     })();
   }, [countdown, selectedRace]);
 
-  // handle end: POST then stop
+  // handle end
   const handleEnd = async () => {
     if (!selectedRace) return;
     try {
@@ -240,21 +244,28 @@ const AdminPanel: React.FC = () => {
     setRaceStarted(false);
   };
 
-  // add competitor
+  // add competitor (ID is now typed in)
   const handleAddOk = () => {
     addForm.validateFields().then(vals => {
-      const nextId = Math.max(0, ...competitors.map(c => c.id)) + 1;
-      setCompetitors(prev => [...prev, { ...vals, id: nextId }]);
+      // Use the `id` typed in (no auto-generation)
+      setCompetitors(prev => [
+        ...prev,
+        { ...vals } as CompetitorBase
+      ]);
       addForm.resetFields();
       setAddVisible(false);
     });
   };
 
-  // edit competitor + delete
+  // edit competitor & delete
   const handleEditOk = () => {
     editForm.validateFields().then(vals => {
       setCompetitors(prev =>
-        prev.map(c => c.id === editing?.id ? { ...c, ...vals } : c)
+        prev.map(c =>
+          c.id === editing?.id
+            ? { ...c, ...vals }
+            : c
+        )
       );
       setEditVisible(false);
     });
@@ -286,7 +297,9 @@ const AdminPanel: React.FC = () => {
               const url = await uploadAvatar(file as File);
               console.log("Uploaded avatar URL:", url);
               setCompetitors(prev =>
-                prev.map(c => c.id === rec.id ? { ...c, avatar: url } : c)
+                prev.map(c =>
+                  c.id === rec.id ? { ...c, avatar: url } : c
+                )
               );
               onSuccess?.({}, new XMLHttpRequest());
             } catch (e: any) {
@@ -301,7 +314,7 @@ const AdminPanel: React.FC = () => {
     },
   ];
 
-  // table columns
+  // table columns (same as before)
   const tableColumns = [
     {
       title: "Avatar",
@@ -318,14 +331,22 @@ const AdminPanel: React.FC = () => {
       title: "Username",
       dataIndex: "username",
       key: "username",
-      sorter: (a: { username: string; }, b: { username: any; }) => a.username.localeCompare(b.username),
+      sorter: (a: { username: string }, b: { username: string }) =>
+        a.username.localeCompare(b.username),
     },
     {
       title: "ID",
       dataIndex: "id",
       key: "id",
       width: 70,
-      sorter: (a: { id: number; }, b: { id: number; }) => a.id - b.id,
+      sorter: (a: { id: number }, b: { id: number }) => a.id - b.id,
+    },
+    {
+      title: "Age Group",
+      dataIndex: "ageGroup",
+      key: "ageGroup",
+      width: 100,
+      render: (ageGroup: string) => <span>{ageGroup}</span>,
     },
     { title: "U", dataIndex: "U", key: "U", width: 60 },
     { title: "I", dataIndex: "I", key: "I", width: 60 },
@@ -371,7 +392,7 @@ const AdminPanel: React.FC = () => {
       <div className="flex flex-1 mt-16 p-8 gap-x-12">
         <div className="p-4"><MainMenu /></div>
 
-        <div className="flex flex-col gap-y-4 w-[600px]">
+        <div className="flex flex-col gap-y-4 w-[700px]">
           <h2 className="text-white text-xl font-semibold">Parameters</h2>
           <Table
             dataSource={competitors}
@@ -381,52 +402,48 @@ const AdminPanel: React.FC = () => {
             size="middle"
           />
           <div className="flex gap-4">
-            <Button type="primary" onClick={() => setAddVisible(true)}>Add user</Button>
+            <Button type="primary" onClick={() => setAddVisible(true)}>
+              Add user
+            </Button>
             <Button onClick={handleUpdate}>Update data</Button>
-          </div>
-        </div>
-
-        <div className="flex flex-col items-center ml-auto gap-y-4">
-          <span className="text-white text-lg">Choose the race</span>
-          <Select<string>
-            placeholder="Race name"
-            style={{ width: 220 }}
-            value={selectedRace}
-            onChange={setSelectedRace}
-            disabled={raceStarted || countdown != null}
-          >
-            {races.map(r => (
-              <Select.Option key={r} value={r}>{r}</Select.Option>
-            ))}
-          </Select>
-          <Button
-            type="primary"
-            onClick={confirmStart}
-            disabled={!selectedRace || raceStarted || countdown != null}
-          >
-            START
-          </Button>
-          <Button danger onClick={handleEnd} disabled={!raceStarted}>
-            END RACE
-          </Button>
-          <Button onClick={() => navigate("/race-config")}>Configure Race</Button>
-          <div className="text-white text-2xl font-bold text-center">
-            Time elapsed:<br />{elapsed}
           </div>
         </div>
       </div>
 
       {/* Add Competitor Modal */}
-      <Modal title="Add Competitor" open={addVisible} onOk={handleAddOk} onCancel={() => setAddVisible(false)}>
+      <Modal
+        title="Add Competitor"
+        open={addVisible}
+        onOk={handleAddOk}
+        onCancel={() => setAddVisible(false)}
+      >
         <Form layout="vertical" form={addForm}>
-          <Form.Item name="username" label="Username" rules={[{ required: true }]}>
+          {/* NEW: ID field */}
+          <Form.Item
+            name="id"
+            label="ID"
+          >
+            <Input type="number" />
+          </Form.Item>
+
+          <Form.Item
+            name="username"
+            label="Username"
+            rules={[{ required: true }]}
+          >
             <Input />
           </Form.Item>
+
+          <Form.Item
+            name="ageGroup"
+            label="Age Group"
+            rules={[{ required: true }]}
+          >
+            <Input placeholder="e.g. 18-25, 26-35" />
+          </Form.Item>
+
           <Form.Item name="U" label="U" initialValue={0}>
             <Input type="number" step="0.01" />
-          </Form.Item>
-          <Form.Item name="I" label="I" initialValue={0}>
-            <Input type="number" step="0.001" />
           </Form.Item>
           <Form.Item name="m" label="m" initialValue={0}>
             <Input type="number" />
@@ -453,14 +470,24 @@ const AdminPanel: React.FC = () => {
         ]}
       >
         <Form layout="vertical" form={editForm}>
-          <Form.Item name="username" label="Username" rules={[{ required: true }]}>
+          <Form.Item
+            name="username"
+            label="Username"
+            rules={[{ required: true }]}
+          >
             <Input />
           </Form.Item>
+
+          <Form.Item
+            name="ageGroup"
+            label="Age Group"
+            rules={[{ required: true }]}
+          >
+            <Input placeholder="e.g. 18-25, 26-35" />
+          </Form.Item>
+
           <Form.Item name="U" label="U" initialValue={0}>
             <Input type="number" step="0.01" />
-          </Form.Item>
-          <Form.Item name="I" label="I" initialValue={0}>
-            <Input type="number" step="0.001" />
           </Form.Item>
           <Form.Item name="m" label="m" initialValue={0}>
             <Input type="number" />
