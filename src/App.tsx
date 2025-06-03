@@ -16,7 +16,7 @@ import ShuttleRun from "@/pages/Categories/ShuttleRun";
 import SteeringTest from "@/pages/Categories/SteeringTest";
 import DragRace from "@/pages/Categories/DragRace";
 import BrakingTest from "@/pages/Categories/BrakingTest";
-import ScoringPage from "@/pages/Categories/ScoringPage";
+import ScoringPage from "@/pages/ScoringPage";
 
 
 function PrivateRoute({ children }: { children: JSX.Element }) {

@@ -37,8 +37,8 @@ type CompetitorBase = {
 };
 type Competitor = CompetitorBase & { finishedAt?: string };
 
-const GET_COMPETITORS = "https://dummyjson.com/c/b6c3-8fa1-416b-9d7b";
-const POST_COMPETITORS = "https://dummyjson.com/c/ee3d-a8c5-49b9-b8e5";
+const GET_COMPETITORS = "https://izv.svaza.lv/api/parameters";
+const POST_COMPETITORS = "https://izv.svaza.lv/api/parameters";
 const GET_RACES = "https://dummyjson.com/c/0ed1-4826-4920-9b90";
 const UPLOAD_AVATAR  = "https://dummyjson.com/c/cd9f-e481-489e-9d62";
 const POST_START_RACE    = "https://dummyjson.com/c/2fa2-d909-402e-8ea2";
