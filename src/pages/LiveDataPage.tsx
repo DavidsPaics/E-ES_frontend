@@ -55,7 +55,7 @@ type Row = Pick<
 
 const LiveDataPage: React.FC = () => {
   const [data, setData] = useState<Row[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [error] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
@@ -113,7 +113,7 @@ const LiveDataPage: React.FC = () => {
       className: "",
       iconSize: [40, 40],
       iconAnchor: [20, 40],
-      popupAnchor: [20, 40],
+      popupAnchor: [0, -30],
     });
   }
 
@@ -144,14 +144,6 @@ const LiveDataPage: React.FC = () => {
       },
     }
   ];
-
-  const center: [number, number] =
-    data.length > 0
-      ? [
-          data.reduce((sum, r) => sum + r.lat, 0) / data.length,
-          data.reduce((sum, r) => sum + r.lon, 0) / data.length,
-        ]
-      : [0, 0];
 
   return (
     <div className="min-h-screen flex flex-col">

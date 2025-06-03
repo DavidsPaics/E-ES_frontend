@@ -1,16 +1,6 @@
 import React from 'react';
 import type { MenuProps } from 'antd';
 import { Menu } from 'antd';
-import ResultsPage from "@/pages/ResultsPage";
-import LiveDataPage from "@/pages/LiveDataPage";
-import WSTestPage from "@/pages/Test";
-import EkoRace from "@/pages/Categories/EkoRace";
-import MainRace from "@/pages/Categories/MainRace";
-import ShuttleRun from "@/pages/Categories/ShuttleRun";
-import SteeringTest from "@/pages/Categories/SteeringTest";
-import DragRace from "@/pages/Categories/DragRace";
-import BrakingTest from "@/pages/Categories/BrakingTest";
-import ScoringPage from "@/pages/ScoringPage";
 
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/authentification/AuthContext';
