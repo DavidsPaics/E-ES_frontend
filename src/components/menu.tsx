@@ -4,6 +4,7 @@ import { Menu } from 'antd';
 
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/authentification/AuthContext';
+import { is } from 'date-fns/locale';
 type MenuItem = Required<MenuProps>['items'][number];
 
 const MainMenu: React.FC = () => {
@@ -57,6 +58,8 @@ const MainMenu: React.FC = () => {
       case 'scoring':
         navigate('/scoring');
         break;
+      case 'race-configuration':
+        navigate('/race-configuration');
     }
   };
 
@@ -72,15 +75,16 @@ const MainMenu: React.FC = () => {
         { key: 'live-data', label: '📊 Live Data' },
         { key: 'test', label: '🧪 Test' },
         { key: 'login', label: '🔑 Login', disabled: isAuthenticated },
-        { key: 'eko-race', label: '🏁 Eko Race' },
-        { key: 'main-race', label: '🏁 Main Race' },
-        { key: 'shuttle-run', label: '🏁 Shuttle Run' },
-        { key: 'steering-test', label: '🏁 Steering Test' },
-        { key: 'drag-race', label: '🏁 Drag Race' },
-        { key: 'braking-test', label: '🏁 Braking Test' },
-        { key: 'scoring', label: '📊 Scoring' },
         isAuthenticated && { key: 'admin', label: '⚙️ Admin Panel' },
         isAuthenticated && { key: 'logout', label: '🚪 Logout' },
+        isAuthenticated && { key: 'scoring', label: '📋 Scoring' },
+        isAuthenticated && { key: 'race-configuration', label: '🏁 Race Configuration' },
+        isAuthenticated && { key: 'eko-race', label: '🏁 Eko Race' },
+        isAuthenticated && { key: 'main-race', label: '🏁 Main Race' },
+        isAuthenticated && { key: 'shuttle-run', label: '🏁 Shuttle Run' },
+        isAuthenticated && { key: 'steering-test', label: '🏁 Steering Test' },
+        isAuthenticated && { key: 'drag-race', label: '🏁 Drag Race' },
+        isAuthenticated && { key: 'braking-test', label: '🏁 Braking Test' },
       ].filter(Boolean) as MenuItem[], // remove nulls
     },
   ];

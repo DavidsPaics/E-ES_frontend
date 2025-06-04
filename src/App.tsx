@@ -17,7 +17,7 @@ import SteeringTest from "@/pages/Categories/SteeringTest";
 import DragRace from "@/pages/Categories/DragRace";
 import BrakingTest from "@/pages/Categories/BrakingTest";
 import ScoringPage from "@/pages/ScoringPage";
-
+import RaceConfiguration from "@/pages/RaceConfiguration";
 
 function PrivateRoute({ children }: { children: JSX.Element }) {
   const { isAuthenticated } = useAuth();
@@ -56,6 +56,8 @@ function App(): JSX.Element {
             <PrivateRoute><BrakingTest /></PrivateRoute>} />
           <Route path="/scoring" element={
             <PrivateRoute><ScoringPage /></PrivateRoute>} />
+          <Route path="/race-configuration" element={
+            <PrivateRoute><RaceConfiguration /></PrivateRoute>} />
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
