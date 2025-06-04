@@ -4,7 +4,6 @@ import { Menu } from 'antd';
 
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/authentification/AuthContext';
-import { is } from 'date-fns/locale';
 type MenuItem = Required<MenuProps>['items'][number];
 
 const MainMenu: React.FC = () => {
