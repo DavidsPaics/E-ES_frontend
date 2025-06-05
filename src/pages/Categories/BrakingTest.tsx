@@ -19,7 +19,7 @@ type Competitor = {
   finishedAt?: string;  // “MM:SS.CS” string when competitor finished
 };
 
-const GET_COMPETITORS = "https://izv.svaza.lv/api/parameters";
+const GET_COMPETITORS = "https://izv.svaza.lv/api/cars";
 const POST_START_RACE = "https://dummyjson.com/c/0399-50b0-471f-904b";
 const POST_FINISH = "https://dummyjson.com/c/08e3-faaa-400d-8cd2";
 
