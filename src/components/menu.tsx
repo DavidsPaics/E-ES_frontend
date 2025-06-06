@@ -59,6 +59,9 @@ const MainMenu: React.FC = () => {
         break;
       case 'race-configuration':
         navigate('/race-configuration');
+        break;
+      case 'points':
+        navigate('/points');
     }
   };
 
@@ -84,6 +87,7 @@ const MainMenu: React.FC = () => {
         isAuthenticated && { key: 'steering-test', label: '🏁 Steering Test' },
         isAuthenticated && { key: 'drag-race', label: '🏁 Drag Race' },
         isAuthenticated && { key: 'braking-test', label: '🏁 Braking Test' },
+        isAuthenticated && { key: 'points', label: '🏁 Points' },
       ].filter(Boolean) as MenuItem[], // remove nulls
     },
   ];
