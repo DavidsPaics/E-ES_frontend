@@ -5,7 +5,9 @@ import {
   Table,
   Button,
   Modal,
+  Popconfirm,
   Input,
+  InputNumber,
   Form,
   message,
   Avatar,
@@ -30,8 +32,9 @@ type Competitor = CompetitorBase & { finishedAt?: string };
 
 const GET_COMPETITORS = "https://izv.svaza.lv/api/cars";
 const POST_COMPETITORS = "https://izv.svaza.lv/api/cars";
-const UPLOAD_AVATAR  = "https://dummyjson.com/c/cd9f-e481-489e-9d62";
-
+const UPDATE_SETTINGS = "https://izv.svaza.lv/api/settings";
+const RESET_DELETE = "https://izv.svaza.lv/api/delete";
+const UPLOAD_AVATAR = "https://dummyjson.com/c/cd9f-e481-489e-9d62";
 
 async function uploadAvatar(file: File): Promise<string> {
   const form = new FormData();
@@ -44,12 +47,17 @@ async function uploadAvatar(file: File): Promise<string> {
 
 const AdminPanel: React.FC = () => {
   const [competitors, setCompetitors] = useState<Competitor[]>([]);
-  const [addVisible, setAddVisible]   = useState(false);
-  const [addForm]   = Form.useForm<CompetitorBase>();
+  const [addVisible, setAddVisible] = useState(false);
+  const [addForm] = Form.useForm<CompetitorBase>();
 
   const [editVisible, setEditVisible] = useState(false);
-  const [editing, setEditing]         = useState<Competitor | null>(null);
+  const [editing, setEditing] = useState<Competitor | null>(null);
   const [editForm] = Form.useForm<CompetitorBase>();
+
+  // Global settings state
+  const [powerCoef, setPowerCoef] = useState<number>(0);
+  const [maxSpd, setMaxSpd] = useState<number>(0);
+
   // fetch competitors
   const fetchCompetitors = async () => {
     try {
@@ -60,7 +68,6 @@ const AdminPanel: React.FC = () => {
       message.error("Failed to load competitors: " + err.message);
     }
   };
-
 
   // save competitors (including ageGroup)
   const handleUpdate = async () => {
@@ -81,9 +88,42 @@ const AdminPanel: React.FC = () => {
         body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      message.success("Data saved");
+      message.success("Competitor data saved");
     } catch (err: any) {
       message.error("Save failed: " + err.message);
+    }
+  };
+
+  // update global settings
+  const handleUpdateSettings = async () => {
+    try {
+      const payload = {
+        PowerCoef: powerCoef,
+        MaxSpd: maxSpd,
+      };
+      console.log("POST settings payload:", payload);
+      const res = await fetch(UPDATE_SETTINGS, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      message.success("Global settings updated");
+    } catch (err: any) {
+      message.error("Update settings failed: " + err.message);
+    }
+  };
+
+  // reset and save database
+  const handleResetAndSave = async () => {
+    try {
+      const res = await fetch(RESET_DELETE, { method: "DELETE" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      message.success("Database reset and saved");
+      // Re-fetch competitors to reflect cleared data
+      fetchCompetitors();
+    } catch (err: any) {
+      message.error("Reset failed: " + err.message);
     }
   };
 
@@ -91,11 +131,9 @@ const AdminPanel: React.FC = () => {
     fetchCompetitors();
   }, []);
 
-
   // add competitor (ID is now typed in)
   const handleAddOk = () => {
     addForm.validateFields().then(vals => {
-      // Use the `id` typed in (no auto-generation)
       setCompetitors(prev => [
         ...prev,
         { ...vals } as CompetitorBase
@@ -210,7 +248,36 @@ const AdminPanel: React.FC = () => {
       <div className="flex flex-1 mt-16 p-8 gap-x-12">
         <div className="p-4"><MainMenu /></div>
 
-        <div className="flex flex-col gap-y-4 w-[700px]">
+        <div className="flex flex-col gap-y-6 w-[700px]">
+          {/* Global Settings Section */}
+          <div className="p-4 bg-white/10 rounded-lg">
+            <h2 className="text-white text-xl font-semibold mb-4">Global Settings</h2>
+            <Form layout="inline">
+              <Form.Item label="Power Coefficient">
+                <InputNumber
+                  min={0}
+                  value={powerCoef}
+                  onChange={(value) => setPowerCoef(value ?? 0)}
+                  style={{ width: 120 }}
+                />
+              </Form.Item>
+              <Form.Item label="Max Speed">
+                <InputNumber
+                  min={0}
+                  value={maxSpd}
+                  onChange={(value) => setMaxSpd(value ?? 0)}
+                  style={{ width: 120 }}
+                />
+              </Form.Item>
+              <Form.Item>
+                <Button type="primary" onClick={handleUpdateSettings}>
+                  Update Global Settings
+                </Button>
+              </Form.Item>
+            </Form>
+          </div>
+
+          {/* Competitors Section */}
           <h2 className="text-white text-xl font-semibold">Parameters</h2>
           <Table
             dataSource={competitors}
@@ -228,6 +295,20 @@ const AdminPanel: React.FC = () => {
         </div>
       </div>
 
+      {/* Reset Button (below everything) */}
+      <div className="p-8 text-center">
+        <Popconfirm
+          title="Are you sure you want to reset the database?"
+          onConfirm={handleResetAndSave}
+          okText="Yes"
+          cancelText="No"
+        >
+          <Button danger>
+            Reset and Save Database
+          </Button>
+        </Popconfirm>
+      </div>
+
       {/* Add Competitor Modal */}
       <Modal
         title="Add Competitor"
@@ -236,10 +317,10 @@ const AdminPanel: React.FC = () => {
         onCancel={() => setAddVisible(false)}
       >
         <Form layout="vertical" form={addForm}>
-          {/* NEW: ID field */}
           <Form.Item
             name="id"
             label="ID"
+            rules={[{ required: true, message: "Please enter an ID" }]}
           >
             <Input type="number" />
           </Form.Item>
@@ -247,7 +328,7 @@ const AdminPanel: React.FC = () => {
           <Form.Item
             name="username"
             label="Username"
-            rules={[{ required: true }]}
+            rules={[{ required: true, message: "Please enter a username" }]}
           >
             <Input />
           </Form.Item>
@@ -255,12 +336,15 @@ const AdminPanel: React.FC = () => {
           <Form.Item
             name="ageGroup"
             label="Age Group"
-            rules={[{ required: true }]}
+            rules={[{ required: true, message: "Please enter an age group" }]}
           >
             <Input placeholder="e.g. 18-25, 26-35" />
           </Form.Item>
 
           <Form.Item name="U" label="U" initialValue={0}>
+            <Input type="number" step="0.01" />
+          </Form.Item>
+          <Form.Item name="I" label="I" initialValue={0}>
             <Input type="number" step="0.01" />
           </Form.Item>
           <Form.Item name="m" label="m" initialValue={0}>
@@ -291,7 +375,7 @@ const AdminPanel: React.FC = () => {
           <Form.Item
             name="username"
             label="Username"
-            rules={[{ required: true }]}
+            rules={[{ required: true, message: "Please enter a username" }]}
           >
             <Input />
           </Form.Item>
@@ -299,12 +383,15 @@ const AdminPanel: React.FC = () => {
           <Form.Item
             name="ageGroup"
             label="Age Group"
-            rules={[{ required: true }]}
+            rules={[{ required: true, message: "Please enter an age group" }]}
           >
             <Input placeholder="e.g. 18-25, 26-35" />
           </Form.Item>
 
           <Form.Item name="U" label="U" initialValue={0}>
+            <Input type="number" step="0.01" />
+          </Form.Item>
+          <Form.Item name="I" label="I" initialValue={0}>
             <Input type="number" step="0.01" />
           </Form.Item>
           <Form.Item name="m" label="m" initialValue={0}>

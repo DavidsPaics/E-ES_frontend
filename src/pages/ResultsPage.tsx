@@ -24,8 +24,8 @@ type ApiResultEntry = {
   [key: string]: string | number;
 };
 
-const RACE_CONFIG_URL = "/api/raceconfiguration";
-const RESULTS_URL = (race: string) => `/api/results/${encodeURIComponent(race)}`;
+const RACE_CONFIG_URL = "https://izv.svaza.lv/api/raceconfiguration";
+const RESULTS_URL = (race: string) => `https://izv.svaza.lv/api/results/${encodeURIComponent(race)}`;
 
 const ResultsPage: React.FC = () => {
   const [races, setRaces]           = useState<string[]>([]);
