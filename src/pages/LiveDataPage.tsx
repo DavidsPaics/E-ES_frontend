@@ -10,7 +10,7 @@ import Battery from "@/components/battery";
 import { formatDistance } from 'date-fns';
 
 // WebSocket endpoint
-const WS_LIVE_URL = "ws://localhost:8765";
+const WS_LIVE_URL = "https://izv.svaza.lv/ws";
 
 // fix Leaflet’s default icon
 import iconRetinaUrl from "leaflet/dist/images/marker-icon-2x.png";

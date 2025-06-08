@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import Battery  from '@/components/battery';
 
-const WS_URL = 'ws://localhost:8765';  // ← make sure this matches your server
+const WS_URL = 'wss://izv.svaza.lv/ws';  // ← make sure this matches your server
 
 export const WSTestPage: React.FC = () => {
   const [status, setStatus]       = useState('Connecting…');

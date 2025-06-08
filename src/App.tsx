@@ -5,7 +5,6 @@ import LoginPage from "@/pages/LoginPage";
 import MainPage from "@/pages/MainPage";
 import AdminPanel from "@/pages/AdminPanel";
 import Leaderboard from "@/pages/Leaderboard";
-import RaceConfigPage from "@/pages/RaceConfigPage";
 import type { JSX } from "react";
 import ResultsPage from "@/pages/ResultsPage";
 import LiveDataPage from "@/pages/LiveDataPage";
@@ -16,7 +15,6 @@ import ShuttleRun from "@/pages/Categories/ShuttleRun";
 import SteeringTest from "@/pages/Categories/SteeringTest";
 import DragRace from "@/pages/Categories/DragRace";
 import BrakingTest from "@/pages/Categories/BrakingTest";
-import ScoringPage from "@/pages/ScoringPage";
 import RaceConfiguration from "@/pages/RaceConfiguration";
 import Points from "@/pages/Points";
 
@@ -41,8 +39,6 @@ function App(): JSX.Element {
           {/* Protected pages */}
           <Route path="/admin" element={
             <PrivateRoute><AdminPanel /></PrivateRoute> } />
-          <Route path="/race-config" element={
-          <PrivateRoute><RaceConfigPage /></PrivateRoute>} />
           <Route path ="/Category/EkoRace" element={
             <PrivateRoute><EkoRace /></PrivateRoute>} />
           <Route path ="/Category/MainRace" element={
@@ -55,8 +51,6 @@ function App(): JSX.Element {
             <PrivateRoute><DragRace /></PrivateRoute>} />
           <Route path ="/Category/BrakingTest" element={
             <PrivateRoute><BrakingTest /></PrivateRoute>} />
-          <Route path="/scoring" element={
-            <PrivateRoute><ScoringPage /></PrivateRoute>} />
           <Route path="/race-configuration" element={
             <PrivateRoute><RaceConfiguration /></PrivateRoute>} />
           <Route path="/points" element={

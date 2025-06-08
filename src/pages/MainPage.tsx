@@ -1,19 +1,8 @@
 import React from 'react';
 import MainMenu from '@/components/menu';
-import { useEffect } from 'react';
-import axios from 'axios';
 
 const MainPage: React.FC = () => {
-    const fetchData = () : void => {
-      axios.get('https://izv.svaza.lv/api/car/2/latest').then((response) => {
-        console.log(response.data);
-      })
-    }
 
-  useEffect((): void => {
-    fetchData();
-  }, []);
-  
   return (
 <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1a1a1a] to-[#b30c0c]">
   {/* Header */}

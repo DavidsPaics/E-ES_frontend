@@ -20,8 +20,8 @@ type Competitor = {
 };
 
 const GET_COMPETITORS = "https://izv.svaza.lv/api/cars";
-const POST_START_RACE = "https://dummyjson.com/c/0399-50b0-471f-904b";
-const POST_FINISH = "https://dummyjson.com/c/08e3-faaa-400d-8cd2";
+const POST_START_RACE = "https://izv.svaza.lv/api/race/start";
+const POST_FINISH = "https://izv.svaza.lv/api/car/finish";
 
 const EkoRace: React.FC = () => {
   const [competitors, setCompetitors] = useState<Competitor[]>([]);

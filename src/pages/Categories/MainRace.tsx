@@ -21,8 +21,8 @@ type Competitor = {
 };
 
 const GET_COMPETITORS = "https://izv.svaza.lv/api/cars";
-const POST_START_RACE = "https://dummyjson.com/c/2fa2-d909-402e-8ea2";
-const POST_FINISH = "https://dummyjson.com/c/151b-a42c-4383-8b61";
+const POST_START_RACE = "https://izv.svaza.lv/api/race/start";
+const POST_FINISH = "https://izv.svaza.lv/api/car/finish";
 
 const MainRace: React.FC = () => {
   const [competitors, setCompetitors] = useState<Competitor[]>([]);
