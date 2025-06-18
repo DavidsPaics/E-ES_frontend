@@ -7,6 +7,7 @@ import type { SortOrder } from "antd/es/table/interface";
 import type { TableProps } from "antd";
 import MainMenu from "@/components/menu";
 import PositionChangeIndicator from "@/components/PositionChangeIndicator";
+import { ENDPOINT_LEADERBOARD, ENDPOINT_COMPETITORS } from "@/config/endpoints";
 
 const { Title } = Typography;
 
@@ -30,9 +31,6 @@ type LeaderboardEntry = {
   [category: string]: number | string | undefined;
 };
 
-const CARS_ENDPOINT = "https://izv.svaza.lv/api/cars";
-const LEADERBOARD_ENDPOINT = "https://izv.svaza.lv/api/leaderboard"; // we will append `/:agegroup` at runtime
-
 const Leaderboard: React.FC = () => {
   // (A) Keep track of every age group we discovered (excluding “all”)
   const [ageGroups, setAgeGroups] = useState<string[] | null>(null);
@@ -52,7 +50,7 @@ const Leaderboard: React.FC = () => {
   // ---------------------------------------------------------------------------------------------------------
   useEffect(() => {
     setLoading(true);
-    fetch(CARS_ENDPOINT)
+    fetch(ENDPOINT_COMPETITORS)
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json() as Promise<
@@ -95,7 +93,7 @@ const Leaderboard: React.FC = () => {
 
     // For each group, fetch /api/leaderboard/:agegroup
     const fetches = groupsToFetch.map((grp) =>
-      fetch(`${LEADERBOARD_ENDPOINT}/${grp}`)
+      fetch(`${ENDPOINT_LEADERBOARD}/${grp}`)
         .then((res) => {
           if (!res.ok) throw new Error(`API /leaderboard/${grp} failed (HTTP ${res.status})`);
           return res.json() as Promise<ApiRecord[]>;

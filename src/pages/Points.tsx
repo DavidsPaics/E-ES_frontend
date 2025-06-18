@@ -17,6 +17,7 @@ import type { ColumnType } from "antd/es/table";
 import { UpOutlined, DownOutlined } from "@ant-design/icons";
 import MainMenu from "@/components/menu";
 import "@ant-design/v5-patch-for-react-19";
+import { ENDPOINT_RACES, ENDPOINT_RESULTS, ENDPOINT_COMPETITORS, ENDPOINT_POINTS } from "@/config/endpoints";
 
 const { Option } = Select;
 
@@ -67,13 +68,6 @@ type Competitor = {
   ageGroup: string;
 };
 
-const GET_RACES = "https://izv.svaza.lv/api/races";
-const GET_RESULTS_BASE = "https://izv.svaza.lv/api/results";
-const GET_COMPETITORS = "https://izv.svaza.lv/api/cars";
-const POST_POINTS = "https://izv.svaza.lv/api/points";
-const DELETE_POINTS = "https://izv.svaza.lv/api/points";
-const DELETE_LEADERBOARD = "https://izv.svaza.lv/api/leaderboard";
-
 const Points: React.FC = () => {
   // ─────────────────────────────────────────────────────
   // Section A: Race Results & Points
@@ -119,7 +113,7 @@ const Points: React.FC = () => {
   useEffect(() => {
     const fetchAllRaces = async () => {
       try {
-        const res = await fetch(GET_RACES);
+        const res = await fetch(ENDPOINT_RACES);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const raw: RawLapForList[] = (await res.json()) as RawLapForList[];
         const unique = Array.from(new Set(raw.map((lap) => lap.RaceName)));
@@ -140,7 +134,7 @@ const Points: React.FC = () => {
     const fetchResults = async () => {
       setLoadingResults(true);
       try {
-        const url = `${GET_RESULTS_BASE}/${encodeURIComponent(selectedRace)}`;
+        const url = `${ENDPOINT_RESULTS}/${encodeURIComponent(selectedRace)}`;
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const rawResults: RawResult[] = (await res.json()) as RawResult[];
@@ -176,7 +170,7 @@ const Points: React.FC = () => {
   useEffect(() => {
     const fetchCompetitors = async () => {
       try {
-        const res = await fetch(GET_COMPETITORS);
+        const res = await fetch(ENDPOINT_COMPETITORS);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const raw: Competitor[] = (await res.json()) as Competitor[];
         setCompetitors(raw);
@@ -293,7 +287,7 @@ const Points: React.FC = () => {
       Points: payloadArray,
     };
     try {
-      const res = await fetch(POST_POINTS, {
+      const res = await fetch(ENDPOINT_POINTS, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -537,7 +531,7 @@ const Points: React.FC = () => {
 
   const deletePointsForRace = async (raceName: string) => {
     try {
-      const res = await fetch(DELETE_POINTS, {
+      const res = await fetch(ENDPOINT_POINTS, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ RaceName: raceName }),
@@ -551,7 +545,7 @@ const Points: React.FC = () => {
 
   const resetLeaderboard = async () => {
     try {
-      const res = await fetch(DELETE_LEADERBOARD, {
+      const res = await fetch(ENDPOINT_POINTS, {
         method: "DELETE",
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -713,7 +707,7 @@ const Points: React.FC = () => {
                   })),
                 };
                 try {
-                  const res = await fetch(POST_POINTS, {
+                  const res = await fetch(ENDPOINT_POINTS, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload),

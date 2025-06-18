@@ -8,9 +8,7 @@ import L from "leaflet";
 import MainMenu from "@/components/menu";
 import Battery from "@/components/battery";
 import { formatDistance } from 'date-fns';
-
-// WebSocket endpoint
-const WS_LIVE_URL = "https://izv.svaza.lv/ws";
+import { ENDPOINT_WS_LIVE } from '@/config/endpoints';
 
 // fix Leaflet’s default icon
 import iconRetinaUrl from "leaflet/dist/images/marker-icon-2x.png";
@@ -55,18 +53,23 @@ type Row = Pick<
 
 const LiveDataPage: React.FC = () => {
   const [data, setData] = useState<Row[]>([]);
-  const [error] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const reconnectAttempts = useRef(0);
 
   useEffect(() => {
     let ws: WebSocket | null = null;
     let reconnectTimeout: NodeJS.Timeout;
 
     const connect = () => {
-      ws = new WebSocket(WS_LIVE_URL);
+      ws = new WebSocket(ENDPOINT_WS_LIVE);
       wsRef.current = ws;
 
-      ws.onopen = () => console.log("✅ WebSocket connected");
+      ws.onopen = () => {
+        console.log("✅ WebSocket connected");
+        reconnectAttempts.current = 0;
+        setError(null);
+      };
       ws.onmessage = (event) => {
         try {
           const raw = JSON.parse(event.data) as MergedRow[];
@@ -91,10 +94,18 @@ const LiveDataPage: React.FC = () => {
           console.error("WS parse error:", err);
         }
       };
-      ws.onerror = (err) => console.error("WebSocket error:", err);
-      ws.onclose = () => {
-        console.log("❌ WebSocket closed. Reconnecting...");
-        reconnectTimeout = setTimeout(connect, 100);
+      ws.onerror = (event) => {
+        console.error("WebSocket error:", event);
+        setError("WebSocket connection error. See console for details.");
+      };
+      ws.onclose = (event) => {
+        console.log("❌ WebSocket closed. Reconnecting...", event);
+        reconnectAttempts.current += 1;
+        if (reconnectAttempts.current > 10) {
+          setError("WebSocket failed to connect after multiple attempts.");
+          return;
+        }
+        reconnectTimeout = setTimeout(connect, 1000 * Math.min(reconnectAttempts.current, 10));
       };
     };
 

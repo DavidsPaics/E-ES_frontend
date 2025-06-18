@@ -16,6 +16,7 @@ import {
 } from "antd";
 import MainMenu from "@/components/menu";
 import '@ant-design/v5-patch-for-react-19';
+import { ENDPOINT_COMPETITORS, ENDPOINT_ADMIN_SETTINGS, ENDPOINT_ADMIN_DELETE } from "@/config/endpoints";
 
 type CompetitorBase = {
   id: string;
@@ -27,11 +28,6 @@ type CompetitorBase = {
   avatar?: string;
 };
 type Competitor = CompetitorBase & { finishedAt?: string };
-
-const GET_COMPETITORS = "https://izv.svaza.lv/api/cars";
-const POST_COMPETITORS = "https://izv.svaza.lv/api/cars";
-const UPDATE_SETTINGS = "https://izv.svaza.lv/api/settings";
-const RESET_DELETE = "https://izv.svaza.lv/api/delete";
 
 const AdminPanel: React.FC = () => {
   const [competitors, setCompetitors] = useState<Competitor[]>([]);
@@ -47,7 +43,7 @@ const AdminPanel: React.FC = () => {
 
   const fetchCompetitors = async () => {
     try {
-      const res = await fetch(GET_COMPETITORS);
+      const res = await fetch(ENDPOINT_COMPETITORS);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setCompetitors((await res.json()) as Competitor[]);
     } catch (err: any) {
@@ -67,7 +63,7 @@ const AdminPanel: React.FC = () => {
         avatar: c.avatar,
       }));
       console.log("POST competitors payload:", payload);
-      const res = await fetch(POST_COMPETITORS, {
+      const res = await fetch(ENDPOINT_COMPETITORS, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -83,7 +79,7 @@ const AdminPanel: React.FC = () => {
     try {
       const payload = { PowerCoef: powerCoef, MaxSpd: maxSpd };
       console.log("POST settings payload:", payload);
-      const res = await fetch(UPDATE_SETTINGS, {
+      const res = await fetch(ENDPOINT_ADMIN_SETTINGS, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -97,7 +93,7 @@ const AdminPanel: React.FC = () => {
 
   const handleResetAndSave = async () => {
     try {
-      const res = await fetch(RESET_DELETE, { method: "DELETE" });
+      const res = await fetch(ENDPOINT_ADMIN_DELETE, { method: "DELETE" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       message.success("Database reset and saved");
       fetchCompetitors();
@@ -108,6 +104,19 @@ const AdminPanel: React.FC = () => {
 
   useEffect(() => {
     fetchCompetitors();
+    // Fetch global settings
+    fetch(ENDPOINT_ADMIN_SETTINGS)
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then(data => {
+        setPowerCoef(data.PowerCoef ?? 0);
+        setMaxSpd(data.MaxSpd ?? 0);
+      })
+      .catch(err => {
+        message.error("Failed to load settings: " + err.message);
+      });
   }, []);
 
   const handleAddOk = () => {

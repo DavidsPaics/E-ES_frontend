@@ -11,6 +11,7 @@ import {
 import MainMenu from "@/components/menu";
 import dayjs from "dayjs";
 import '@ant-design/v5-patch-for-react-19';
+import { ENDPOINT_COMPETITORS, ENDPOINT_COMPETITORS_START_RACE, ENDPOINT_COMPETITORS_FINISH } from "@/config/endpoints";
 
 type Competitor = {
   id: number;
@@ -19,10 +20,6 @@ type Competitor = {
   startedAt?: string;   // ISO timestamp when this competitor’s timer was started
   finishedAt?: string;  // “MM:SS.CS” string when competitor finished
 };
-
-const GET_COMPETITORS = "https://izv.svaza.lv/api/cars";
-const POST_START_RACE = "https://izv.svaza.lv/api/race/start";
-const POST_FINISH = "https://izv.svaza.lv/api/car/finish";
 
 const MainRace: React.FC = () => {
   const [competitors, setCompetitors] = useState<Competitor[]>([]);
@@ -35,7 +32,7 @@ const MainRace: React.FC = () => {
   // fetch competitors
   const fetchCompetitors = async () => {
     try {
-      const res = await fetch(GET_COMPETITORS);
+      const res = await fetch(ENDPOINT_COMPETITORS);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setCompetitors((await res.json()) as Competitor[]);
     } catch (err: any) {
@@ -81,7 +78,7 @@ const MainRace: React.FC = () => {
         for (const id of toStart) {
           try {
             const payload = { raceName: lapName, ID: id };
-            const res = await fetch(POST_START_RACE, {
+            const res = await fetch(ENDPOINT_COMPETITORS_START_RACE, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(payload),
@@ -138,7 +135,7 @@ const MainRace: React.FC = () => {
     const lapName = `race${selectedLap}`;
     try {
       const payload = { raceName: lapName, ID: id };
-      const res = await fetch(POST_FINISH, {
+      const res = await fetch(ENDPOINT_COMPETITORS_FINISH, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

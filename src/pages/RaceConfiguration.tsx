@@ -11,6 +11,7 @@ import {
 } from "antd";
 import MainMenu from "@/components/menu";
 import "@ant-design/v5-patch-for-react-19";
+import { ENDPOINT_RACES } from "@/config/endpoints";
 
 type RawLap = {
   RaceName: string;
@@ -25,9 +26,6 @@ type Race = {
   laps: number;       // total number of laps for that race
 };
 
-const GET_RACES = "https://izv.svaza.lv/api/races";
-const POST_RACES = "https://izv.svaza.lv/api/races";
-
 const RaceConfiguration: React.FC = () => {
   const [races, setRaces] = useState<Race[]>([]);
   const [addVisible, setAddVisible] = useState(false);
@@ -40,7 +38,7 @@ const RaceConfiguration: React.FC = () => {
   // 1) Fetch the raw “array of laps” from API, then aggregate into one Race per unique RaceName
   const fetchRaces = async () => {
     try {
-      const res = await fetch(GET_RACES);
+      const res = await fetch(ENDPOINT_RACES);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const raw: RawLap[] = (await res.json()) as RawLap[];
@@ -93,7 +91,7 @@ const RaceConfiguration: React.FC = () => {
         }))
       );
 
-      const res = await fetch(POST_RACES, {
+      const res = await fetch(ENDPOINT_RACES, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

@@ -1,8 +1,9 @@
 // src/pages/WSTestPage.tsx
 import React, { useEffect, useState, useRef } from 'react';
 import Battery  from '@/components/battery';
+import { ENDPOINT_WS_LIVE } from '@/config/endpoints';
 
-const WS_URL = 'wss://izv.svaza.lv/ws';  // ← make sure this matches your server
+const WS_URL = ENDPOINT_WS_LIVE;  // Use centralized endpoint
 
 export const WSTestPage: React.FC = () => {
   const [status, setStatus]       = useState('Connecting…');
@@ -18,8 +19,15 @@ export const WSTestPage: React.FC = () => {
     };
 
     ws.onmessage = (e: MessageEvent) => {
-      // accumulate incoming text
-      setMessages(msgs => [...msgs, e.data]);
+      // Try to pretty-print JSON, otherwise show as text
+      let msg: string;
+      try {
+        const parsed = JSON.parse(e.data);
+        msg = JSON.stringify(parsed, null, 2);
+      } catch {
+        msg = e.data;
+      }
+      setMessages(msgs => [...msgs, msg]);
     };
 
     ws.onerror = () => {
