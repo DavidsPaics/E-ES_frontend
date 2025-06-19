@@ -8,7 +8,7 @@ import Leaderboard from "@/pages/Leaderboard";
 import type { JSX } from "react";
 import ResultsPage from "@/pages/ResultsPage";
 import LiveDataPage from "@/pages/LiveDataPage";
-import WSTestPage from "@/pages/Test";
+import Test from "@/pages/Test";
 import EkoRace from "@/pages/Categories/EkoRace";
 import MainRace from "@/pages/Categories/MainRace";
 import ShuttleRun from "@/pages/Categories/ShuttleRun";
@@ -35,7 +35,7 @@ function App(): JSX.Element {
           
           <Route path="/results" element={<ResultsPage />} />
           <Route path="/live-data" element={<LiveDataPage />} />
-          <Route path="/test" element={<WSTestPage />} />
+          <Route path="/test" element={<Test />} />
           {/* Protected pages */}
           <Route path="/admin" element={
             <PrivateRoute><AdminPanel /></PrivateRoute> } />
