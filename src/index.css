@@ -7,5 +7,50 @@
 
 }
 body {
-  background-color: #068398;
+  background-color: #FCFDFD;
+  color: #0A306D;
+}
+
+/* Force Ant Design Menu text to be visible on dark blue sidebar */
+.ant-menu {
+  color: #FCFDFD !important;
+}
+.ant-menu-item,
+.ant-menu-submenu-title {
+  color: #FCFDFD !important;
+}
+.ant-menu-item:hover,
+.ant-menu-submenu-title:hover {
+  color: #4EA9D5 !important;
+}
+.ant-menu-item-selected {
+  color: #4EA9D5 !important;
+}
+
+/* Ant Design form labels & general text on dark backgrounds */
+.ant-form-item-label > label {
+  color: #FCFDFD !important;
+}
+.ant-table-thead > tr > th {
+  color: #FCFDFD !important;
+  background-color: rgba(10, 48, 109, 0.6) !important;
+}
+
+/* Ant Design Tabs on dark backgrounds */
+.points-tabs .ant-tabs-tab {
+  color: rgba(255, 255, 255, 0.65) !important;
+  background: rgba(10, 48, 109, 0.4) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+.points-tabs .ant-tabs-tab-active {
+  background: rgba(78, 169, 213, 0.2) !important;
+}
+.points-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: #4EA9D5 !important;
+}
+.points-tabs .ant-tabs-tab:hover .ant-tabs-tab-btn {
+  color: #4EA9D5 !important;
+}
+.points-tabs .ant-tabs-nav::before {
+  border-color: rgba(255, 255, 255, 0.15) !important;
 }
