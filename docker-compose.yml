@@ -1,0 +1,19 @@
+services:
+  vite:
+    image: node:20
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    command: sh -c "npm install && npm run dev -- --host"
+
+  go:
+    image: golang:1.22
+    working_dir: /app/server
+    volumes:
+      - ./server:/app/server
+    ports:
+      - "8080:8080"
+    command: sh -c "go mod tidy && go run get_registrations.go"
