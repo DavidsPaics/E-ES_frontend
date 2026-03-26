@@ -5,6 +5,7 @@ import { TeamOutlined, SearchOutlined, FormOutlined, CheckCircleOutlined, CloseC
 import "@ant-design/v5-patch-for-react-19";
 import { ENDPOINT_APPLICATIONS } from "@/webapp/config/endpoints";
 
+
 interface Applicant {
   id: string;
   teamName: string;
@@ -35,26 +36,67 @@ const ApplicationPage: React.FC = () => {
   const [search, setSearch] = useState("");
 
   const googleFormUrl = "https://docs.google.com/forms/d/e/1FAIpQLSd8DkWBFwrYVwxFVHqMDa3hR7gw028b-yvfmnk6ZewvDXspbw/viewform?usp=publish-editor";
+  const GO_BACKEND = "http://localhost:8080/api/users";
+  // useEffect(() => {
+  //   let cancelled = false;
+  //   setLoading(true);
+  //   fetch(ENDPOINT_APPLICATIONS)
+  //     .then((res) => {
+  //       if (!res.ok) throw new Error("Server error");
+  //       return res.json();
+  //     })
+  //     .then((data: Applicant[]) => {
+  //       if (!cancelled) setApplicants(data);
+  //     })
+  //     .catch(() => {
+  //       if (!cancelled) setApplicants(FAKE_APPLICANTS);
+  //     })
+  //     .finally(() => {
+  //       if (!cancelled) setLoading(false);
+  //     });
+  //   return () => { cancelled = true; };
+  // }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    fetch(ENDPOINT_APPLICATIONS)
-      .then((res) => {
+  const STATUS_MAP = ["in_process", "accepted", "denied"] as const;
+
+useEffect(() => {
+  let cancelled = false;
+  setLoading(true);
+
+  const fetchApplicants = () => {
+    fetch(GO_BACKEND)
+      .then(res => {
         if (!res.ok) throw new Error("Server error");
         return res.json();
       })
-      .then((data: Applicant[]) => {
-        if (!cancelled) setApplicants(data);
+      .then((data: any[]) => {
+        console.log("Fetched raw data:", data);
+        if (!cancelled) {
+          const mapped: Applicant[] = data.map((u, idx) => ({
+            id: idx.toString(),                 // generate id for table rowKey
+            teamName: u.name,
+            school: u.school,
+            members: u.participants,
+            supervisor: u.mentor,
+            appliedAt: new Date().toISOString().split("T")[0], // default today
+            status: STATUS_MAP[u.status] || "in_process",
+          }));
+          setApplicants(mapped);
+        }
       })
-      .catch(() => {
+      .catch(err => {
+        console.error("Fetch error:", err);
         if (!cancelled) setApplicants(FAKE_APPLICANTS);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-    return () => { cancelled = true; };
-  }, []);
+  };
+
+  fetchApplicants();                   // initial fetch
+  const interval = setInterval(fetchApplicants, 5000); // refresh every 5s
+  return () => { cancelled = true; clearInterval(interval); };
+}, []);
 
   const statusConfig: Record<Applicant["status"], { color: string; icon: React.ReactNode; label: string }> = {
     accepted: { color: "green", icon: <CheckCircleOutlined />, label: t("website.apply.statusAccepted") },
