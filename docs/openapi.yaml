@@ -1,0 +1,1287 @@
+openapi: 3.0.3
+info:
+  title: E-ES Link API
+  description: |
+    API for the E-ES Link - Electric Vehicle Racing Championship application.
+    This API manages competitors, races, live tracking, results, leaderboards,
+    as well as the public website content: news articles, competition events, and team applications.
+  version: 1.1.0
+  contact:
+    name: E-ES Link Team
+
+servers:
+  - url: https://izv.svaza.lv
+    description: Production server
+  - url: http://localhost:8000
+    description: Local development server
+
+tags:
+  - name: Auth
+    description: Authentication endpoints
+  - name: Users
+    description: User management
+  - name: Competitors
+    description: Competitor/Car management
+  - name: Races
+    description: Race configuration and management
+  - name: Results
+    description: Race results
+  - name: Points
+    description: Points assignment
+  - name: Leaderboard
+    description: Leaderboard and rankings
+  - name: Admin
+    description: Administrative operations
+  - name: News
+    description: News articles for the public website
+  - name: Events
+    description: Competition events and schedule
+  - name: Applications
+    description: Team application management
+  - name: WebSocket
+    description: Real-time data streaming
+
+paths:
+  /api/login:
+    post:
+      tags:
+        - Auth
+      summary: User login
+      description: Authenticate a user and receive a JWT token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                  example: admin
+                password:
+                  type: string
+                  format: password
+                  example: secret123
+      responses:
+        '200':
+          description: Successful login
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    description: JWT token for authentication
+                    example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        '401':
+          description: Invalid credentials
+
+  /api/users:
+    get:
+      tags:
+        - Users
+      summary: Get all users
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+
+  /api/cars:
+    get:
+      tags:
+        - Competitors
+      summary: Get all competitors (cars)
+      description: Retrieve a list of all registered competitors with their vehicle parameters
+      responses:
+        '200':
+          description: List of competitors
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Competitor'
+    post:
+      tags:
+        - Competitors
+      summary: Update competitors
+      description: Save/update the list of competitors
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/Competitor'
+      responses:
+        '200':
+          description: Competitors saved successfully
+        '401':
+          description: Unauthorized
+
+  /api/race/start:
+    post:
+      tags:
+        - Races
+      summary: Start a race for a competitor
+      description: Record the start time for a competitor in a specific race
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - raceName
+                - ID
+              properties:
+                raceName:
+                  type: string
+                  description: Name of the race (e.g., "EkoRace1", "MainRace2")
+                  example: EkoRace1
+                ID:
+                  type: integer
+                  description: Competitor ID
+                  example: 1
+      responses:
+        '200':
+          description: Race started successfully
+        '400':
+          description: Invalid request
+        '401':
+          description: Unauthorized
+
+  /api/car/finish:
+    post:
+      tags:
+        - Races
+      summary: Finish a race for a competitor
+      description: Record the finish time for a competitor
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ID
+              properties:
+                ID:
+                  type: integer
+                  description: Competitor ID
+                  example: 1
+      responses:
+        '200':
+          description: Race finished successfully
+        '400':
+          description: Invalid request
+        '401':
+          description: Unauthorized
+
+  /api/races:
+    get:
+      tags:
+        - Races
+      summary: Get all race laps
+      description: Retrieve all race configurations as individual lap entries
+      responses:
+        '200':
+          description: List of race laps
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RaceLap'
+    post:
+      tags:
+        - Races
+      summary: Update race configurations
+      description: Save/update race lap configurations
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/RaceLap'
+      responses:
+        '200':
+          description: Races saved successfully
+        '401':
+          description: Unauthorized
+
+  /api/race-config:
+    get:
+      tags:
+        - Races
+      summary: Get race configurations
+      description: Retrieve race configurations with scoring parameters
+      responses:
+        '200':
+          description: List of race configurations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RaceConfig'
+
+  /api/results/{raceName}:
+    get:
+      tags:
+        - Results
+      summary: Get results for a specific race
+      description: Retrieve all results for a specific race
+      parameters:
+        - name: raceName
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Name of the race
+          example: EkoRace
+      responses:
+        '200':
+          description: Race results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RaceResult'
+        '404':
+          description: Race not found
+
+  /api/points:
+    post:
+      tags:
+        - Points
+      summary: Submit points for competitors
+      description: Assign points to competitors for a race
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - raceName
+                - points
+              properties:
+                raceName:
+                  type: string
+                  example: EkoRace
+                points:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      ID:
+                        type: integer
+                      points:
+                        type: number
+      responses:
+        '200':
+          description: Points saved successfully
+        '401':
+          description: Unauthorized
+    delete:
+      tags:
+        - Points
+      summary: Delete points for a race
+      description: Remove all points for a specific race
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: raceName
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Name of the race to delete points for
+      responses:
+        '200':
+          description: Points deleted successfully
+        '401':
+          description: Unauthorized
+
+  /api/leaderboard/{ageGroup}:
+    get:
+      tags:
+        - Leaderboard
+      summary: Get leaderboard by age group
+      description: Retrieve leaderboard rankings for a specific age group or all competitors
+      parameters:
+        - name: ageGroup
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Age group identifier or "all" for overall leaderboard
+          example: all
+      responses:
+        '200':
+          description: Leaderboard data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LeaderboardEntry'
+
+  /api/categories:
+    get:
+      tags:
+        - Races
+      summary: Get race categories
+      description: Retrieve list of available race categories
+      responses:
+        '200':
+          description: List of categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                example: ["EkoRace", "MainRace", "DragRace", "ShuttleRun", "SteeringTest", "BrakingTest"]
+
+  /api/admin:
+    get:
+      tags:
+        - Admin
+      summary: Get admin dashboard data
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Admin dashboard data
+        '401':
+          description: Unauthorized
+
+  /api/settings:
+    get:
+      tags:
+        - Admin
+      summary: Get global settings
+      description: Retrieve global race settings (power coefficient, max speed)
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Global settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlobalSettings'
+    post:
+      tags:
+        - Admin
+      summary: Update global settings
+      description: Update global race settings
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GlobalSettings'
+      responses:
+        '200':
+          description: Settings updated successfully
+        '401':
+          description: Unauthorized
+
+  /api/delete:
+    delete:
+      tags:
+        - Admin
+      summary: Reset database
+      description: Reset and clear all race data from the database
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Database reset successfully
+        '401':
+          description: Unauthorized
+
+  /api/news:
+    get:
+      tags:
+        - News
+      summary: Get all news articles
+      description: Retrieve news articles. Optionally filter by published status or tag.
+      parameters:
+        - name: published
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: Filter by published status. Omit to return all articles (admin view).
+        - name: tag
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter articles by tag
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Maximum number of articles to return
+      responses:
+        '200':
+          description: List of news articles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NewsArticle'
+    post:
+      tags:
+        - News
+      summary: Create a news article
+      description: Create a new news article (admin only)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewsArticle'
+      responses:
+        '201':
+          description: Article created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewsArticle'
+        '400':
+          description: Invalid article data
+        '401':
+          description: Unauthorized
+
+  /api/news/{id}:
+    get:
+      tags:
+        - News
+      summary: Get a single news article
+      description: Retrieve a specific news article by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Article ID
+      responses:
+        '200':
+          description: News article
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewsArticle'
+        '404':
+          description: Article not found
+    put:
+      tags:
+        - News
+      summary: Update a news article
+      description: Update an existing news article (admin only)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Article ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewsArticle'
+      responses:
+        '200':
+          description: Article updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewsArticle'
+        '404':
+          description: Article not found
+        '401':
+          description: Unauthorized
+    delete:
+      tags:
+        - News
+      summary: Delete a news article
+      description: Delete a news article (admin only)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Article ID
+      responses:
+        '200':
+          description: Article deleted successfully
+        '404':
+          description: Article not found
+        '401':
+          description: Unauthorized
+
+  /api/news/{id}/attachments:
+    post:
+      tags:
+        - News
+      summary: Upload attachment to article
+      description: Upload an image, PDF, or other file attachment to a news article (admin only). Max 10 MB per file.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Article ID
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: File to upload (max 10 MB)
+      responses:
+        '201':
+          description: File uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttachedFile'
+        '400':
+          description: File too large or invalid format
+        '401':
+          description: Unauthorized
+        '404':
+          description: Article not found
+
+  /api/events:
+    get:
+      tags:
+        - Events
+      summary: Get all competition events
+      description: Retrieve competition events. Optionally filter by status.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [upcoming, ongoing, completed]
+          description: Filter events by status
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Maximum number of events to return
+      responses:
+        '200':
+          description: List of competition events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CompetitionEvent'
+    post:
+      tags:
+        - Events
+      summary: Create a competition event
+      description: Create a new competition event (admin only)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompetitionEvent'
+      responses:
+        '201':
+          description: Event created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompetitionEvent'
+        '400':
+          description: Invalid event data
+        '401':
+          description: Unauthorized
+
+  /api/events/{id}:
+    get:
+      tags:
+        - Events
+      summary: Get a single event
+      description: Retrieve a specific competition event by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Event ID
+      responses:
+        '200':
+          description: Competition event
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompetitionEvent'
+        '404':
+          description: Event not found
+    put:
+      tags:
+        - Events
+      summary: Update a competition event
+      description: Update an existing competition event (admin only)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Event ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompetitionEvent'
+      responses:
+        '200':
+          description: Event updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompetitionEvent'
+        '404':
+          description: Event not found
+        '401':
+          description: Unauthorized
+    delete:
+      tags:
+        - Events
+      summary: Delete a competition event
+      description: Delete a competition event (admin only)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Event ID
+      responses:
+        '200':
+          description: Event deleted successfully
+        '404':
+          description: Event not found
+        '401':
+          description: Unauthorized
+
+  /api/applications:
+    get:
+      tags:
+        - Applications
+      summary: Get all team applications
+      description: Retrieve all submitted team applications with their current status
+      responses:
+        '200':
+          description: List of team applications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Applicant'
+    post:
+      tags:
+        - Applications
+      summary: Submit a new team application
+      description: Submit a new team application for the championship
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Applicant'
+      responses:
+        '201':
+          description: Application submitted successfully
+        '400':
+          description: Invalid application data
+        '401':
+          description: Unauthorized
+
+  /api/applications/{id}:
+    patch:
+      tags:
+        - Applications
+      summary: Update application status
+      description: Accept, deny, or update a team application
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Application ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [accepted, denied, in_process]
+      responses:
+        '200':
+          description: Application updated successfully
+        '404':
+          description: Application not found
+        '401':
+          description: Unauthorized
+
+  /ws:
+    get:
+      tags:
+        - WebSocket
+      summary: Live data WebSocket connection
+      description: |
+        WebSocket endpoint for real-time live tracking data.
+        
+        **Connection URL:** `wss://izv.svaza.lv/ws` or `wss://izv.svaza.lv/ws?token={jwt_token}`
+        
+        **Message Format (Server → Client):**
+        ```json
+        [
+          {
+            "key": "live-1",
+            "ID": 1,
+            "username": "Lightning McQueen",
+            "avatar": "https://example.com/avatar.png",
+            "status": "online",
+            "position": 1,
+            "lat": 56.6609,
+            "lon": 23.7436,
+            "spd": 45.5,
+            "power": 350,
+            "acceleration": 2.1,
+            "voltage": 42.5,
+            "updatedAt": "2026-02-03T12:00:00Z"
+          }
+        ]
+        ```
+      parameters:
+        - name: token
+          in: query
+          required: false
+          schema:
+            type: string
+          description: JWT token for authenticated access
+      responses:
+        '101':
+          description: WebSocket connection upgraded
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from /api/login
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        role:
+          type: string
+          enum: [admin, user]
+
+    Competitor:
+      type: object
+      required:
+        - id
+        - username
+        - U
+        - I
+        - m
+        - ageGroup
+      properties:
+        id:
+          type: string
+          description: Unique competitor identifier
+          example: "1"
+        username:
+          type: string
+          description: Competitor/team name
+          example: Lightning McQueen
+        avatar:
+          type: string
+          format: uri
+          description: URL to competitor's avatar image
+          example: https://api.dicebear.com/7.x/bottts/svg?seed=1
+        U:
+          type: number
+          format: float
+          description: Battery voltage (V)
+          example: 48
+        I:
+          type: number
+          format: float
+          description: Battery current (A)
+          example: 12
+        m:
+          type: number
+          format: float
+          description: Vehicle mass (kg)
+          example: 85
+        ageGroup:
+          type: string
+          description: Age group category
+          example: A
+        finishedAt:
+          type: string
+          description: Finish time in MM:SS.CS format
+          example: "05:32.45"
+
+    RaceLap:
+      type: object
+      required:
+        - RaceName
+        - Lap
+        - Length
+      properties:
+        RaceName:
+          type: string
+          description: Name of the race
+          example: EkoRace
+        Lap:
+          type: integer
+          description: Lap number
+          example: 1
+        Length:
+          type: number
+          format: float
+          description: Lap length in kilometers
+          example: 2.5
+
+    RaceConfig:
+      type: object
+      properties:
+        RaceName:
+          type: string
+          example: EkoRace
+        Length:
+          type: number
+          format: float
+          description: Total race length in km
+          example: 2.5
+        Coef:
+          type: number
+          format: float
+          description: Scoring coefficient
+          example: 1.2
+        SortBy:
+          type: string
+          description: Metric used for ranking
+          enum: [time, efficiency, distance]
+          example: efficiency
+        Distribution:
+          type: array
+          items:
+            type: integer
+          description: Points distribution for positions
+          example: [100, 80, 65, 50, 40, 30, 25, 20, 15, 10]
+
+    RaceResult:
+      type: object
+      properties:
+        ID:
+          type: integer
+          example: 1
+        Username:
+          type: string
+          example: Lightning McQueen
+        avatar:
+          type: string
+          format: uri
+          example: https://api.dicebear.com/7.x/bottts/svg?seed=1
+        RaceName:
+          type: string
+          example: EkoRace
+        Lap:
+          type: integer
+          example: 1
+        Used energy:
+          type: number
+          format: float
+          description: Energy consumed in Wh
+          example: 45.5
+        Efficiency:
+          type: number
+          format: float
+          description: Efficiency percentage
+          example: 85.2
+        Shellefficiency:
+          type: number
+          format: float
+          description: Shell efficiency percentage
+          example: 88.5
+        Average power:
+          type: number
+          format: float
+          description: Average power in Watts
+          example: 250
+        Average speed:
+          type: number
+          format: float
+          description: Average speed in km/h
+          example: 32.5
+        Elapsed time:
+          type: string
+          description: Time in HH:MM:SS.CS format
+          example: "00:08:32.45"
+        Points:
+          type: number
+          description: Points earned
+          example: 100
+
+    LeaderboardEntry:
+      type: object
+      properties:
+        ID:
+          type: integer
+          example: 1
+        username:
+          type: string
+          example: Lightning McQueen
+        avatar:
+          type: string
+          format: uri
+          example: https://api.dicebear.com/7.x/bottts/svg?seed=1
+        position_change:
+          type: integer
+          description: Position change since last update (positive = moved up)
+          example: 2
+        Category names:
+          type: array
+          items:
+            type: string
+          description: List of race category names
+          example: ["EkoRace", "MainRace", "DragRace"]
+        Category points:
+          type: array
+          items:
+            type: number
+          description: Points for each category (same order as Category names)
+          example: [85, 92, 78]
+
+    LiveData:
+      type: object
+      properties:
+        key:
+          type: string
+          example: live-1
+        ID:
+          type: integer
+          example: 1
+        username:
+          type: string
+          example: Lightning McQueen
+        avatar:
+          type: string
+          format: uri
+        status:
+          type: string
+          enum: [online, offline, ping]
+          description: Connection status
+        position:
+          type: integer
+          description: Current race position
+          example: 1
+        lat:
+          type: number
+          format: double
+          description: GPS latitude
+          example: 56.66090993638844
+        lon:
+          type: number
+          format: double
+          description: GPS longitude
+          example: 23.74363904512851
+        spd:
+          type: number
+          format: float
+          description: Current speed in km/h
+          example: 45.5
+        power:
+          type: number
+          format: float
+          description: Current power consumption in Watts
+          example: 350
+        acceleration:
+          type: number
+          format: float
+          description: Current acceleration in m/s²
+          example: 2.1
+        voltage:
+          type: number
+          format: float
+          description: Current battery voltage
+          example: 42.5
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          example: "2026-02-03T12:00:00Z"
+
+    BilingualText:
+      type: object
+      description: Bilingual text content (English and Latvian)
+      required:
+        - en
+        - lv
+      properties:
+        en:
+          type: string
+          description: English text
+        lv:
+          type: string
+          description: Latvian text
+
+    AttachedFile:
+      type: object
+      required:
+        - name
+        - type
+        - url
+      properties:
+        name:
+          type: string
+          description: Original filename
+          example: competition-rules.pdf
+        type:
+          type: string
+          description: MIME type of the file
+          example: application/pdf
+        url:
+          type: string
+          format: uri
+          description: URL to download the file
+          example: https://izv.svaza.lv/uploads/news/competition-rules.pdf
+
+    NewsArticle:
+      type: object
+      required:
+        - id
+        - title
+        - summary
+        - content
+        - author
+        - date
+        - tags
+        - published
+      properties:
+        id:
+          type: string
+          description: Unique article identifier
+          example: "article-1"
+        title:
+          $ref: '#/components/schemas/BilingualText'
+        summary:
+          $ref: '#/components/schemas/BilingualText'
+        content:
+          $ref: '#/components/schemas/BilingualText'
+        author:
+          type: string
+          description: Author name
+          example: E-ES Team
+        date:
+          type: string
+          format: date
+          description: Publication date
+          example: "2026-01-15"
+        image:
+          type: string
+          format: uri
+          description: URL of the cover image
+          example: https://izv.svaza.lv/uploads/news/cover-1.jpg
+        tags:
+          type: array
+          items:
+            type: string
+          description: Article tags for filtering
+          example: ["announcement", "2026", "championship"]
+        published:
+          type: boolean
+          description: Whether the article is visible on the public website
+          example: true
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/AttachedFile'
+          description: Optional file attachments (PDFs, images, documents)
+
+    CompetitionEvent:
+      type: object
+      required:
+        - id
+        - title
+        - description
+        - date
+        - location
+        - status
+      properties:
+        id:
+          type: string
+          description: Unique event identifier
+          example: "evt-1"
+        title:
+          $ref: '#/components/schemas/BilingualText'
+        description:
+          $ref: '#/components/schemas/BilingualText'
+        date:
+          type: string
+          format: date
+          description: Event start date
+          example: "2026-06-06"
+        endDate:
+          type: string
+          format: date
+          description: Event end date (if multi-day)
+          example: "2026-06-06"
+        location:
+          $ref: '#/components/schemas/BilingualText'
+        registrationUrl:
+          type: string
+          format: uri
+          description: External registration form URL
+          example: https://forms.gle/example
+        status:
+          type: string
+          enum: [upcoming, ongoing, completed]
+          description: Current event status
+          example: upcoming
+
+    Applicant:
+      type: object
+      required:
+        - id
+        - teamName
+        - school
+        - members
+        - supervisor
+        - appliedAt
+        - status
+      properties:
+        id:
+          type: string
+          description: Unique application identifier
+          example: "1"
+        teamName:
+          type: string
+          description: Name of the competing team
+          example: Volt Racers
+        school:
+          type: string
+          description: School or institution the team represents
+          example: Rīgas Valsts 1. ģimnāzija
+        members:
+          type: integer
+          description: Number of team members
+          example: 4
+        supervisor:
+          type: string
+          description: Name of the team supervisor
+          example: A. Bērziņš
+        appliedAt:
+          type: string
+          format: date
+          description: Date the application was submitted
+          example: "2026-01-20"
+        status:
+          type: string
+          enum: [accepted, denied, in_process]
+          description: Current application status
+          example: accepted
+
+    GlobalSettings:
+      type: object
+      properties:
+        PowerCoef:
+          type: number
+          format: float
+          description: Power coefficient for calculations
+          example: 1.5
+        MaxSpd:
+          type: number
+          format: float
+          description: Maximum allowed speed in km/h
+          example: 60
