@@ -25,44 +25,19 @@
     "react-dom": "^19.1.0",
     "react-i18next": "^16.5.4",
     "react-leaflet": "^5.0.0",
-<<<<<<< HEAD
-<<<<<<< HEAD
     "react-router-dom": "^7.6.0"
-=======
-    "react-router-dom": "^6.0.0"
->>>>>>> 495beb6cddce6585cc1a6947dbe70368864ca7cf
-=======
-    "react-router-dom": "^7.6.0"
->>>>>>> 183d3230a7a955b7fca8ab3d7b44c35d382759ad
   },
   "devDependencies": {
     "@eslint/js": "^9.25.0",
     "@types/leaflet": "^1.9.17",
-<<<<<<< HEAD
-<<<<<<< HEAD
-    "@types/react": "^19.1.4",
-    "@types/react-dom": "^19.1.4",
-=======
-    "@types/react": "^19.1.2",
-    "@types/react-dom": "^19.1.2",
-    "@types/react-router-dom": "^5.3.3",
->>>>>>> 495beb6cddce6585cc1a6947dbe70368864ca7cf
-    "@vitejs/plugin-react": "^4.4.1",
-    "autoprefixer": "^10.4.21",
-    "eslint": "^9.25.0",
-    "eslint-plugin-react-hooks": "^5.2.0",
-=======
     "@types/react": "^19.1.4",
     "@types/react-dom": "^19.1.4",
     "@types/react-router-dom": "^5.3.3",
     "@vitejs/plugin-react": "^4.5.0",
->>>>>>> 183d3230a7a955b7fca8ab3d7b44c35d382759ad
-    "eslint-plugin-react-refresh": "^0.4.19",
-    "globals": "^16.0.0",
-    "postcss": "^8.5.3",
-    "tailwindcss": "^4.1.6",
-    "typescript": "~5.8.3",
-    "typescript-eslint": "^8.30.1",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^9.25.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "typescript": "^5.2.2",
     "vite": "^6.3.5"
   }
 }
