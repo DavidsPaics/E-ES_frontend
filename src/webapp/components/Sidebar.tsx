@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/webapp/authentification/AuthContext";
 import { useTranslation } from "react-i18next";
@@ -27,6 +27,10 @@ import {
   GlobalOutlined,
   ArrowLeftOutlined,
   AppstoreOutlined,
+  MenuOutlined,
+  CloseOutlined,
+  DesktopOutlined,
+  FileSearchOutlined,
 } from "@ant-design/icons";
 import { Tooltip } from "antd";
 
@@ -46,11 +50,13 @@ interface NavGroup {
 }
 
 const Sidebar: React.FC = () => {
+  const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, currentUser, logout } = useAuth();
   const { t, i18n } = useTranslation();
   const { collapsed, setCollapsed } = useSidebar();
+  const isWebappAdmin = currentUser?.role === "admin" || currentUser?.role === "super_admin";
 
   const toggleLanguage = () => {
     i18n.changeLanguage(i18n.language === "lv" ? "en" : "lv");
@@ -73,6 +79,13 @@ const Sidebar: React.FC = () => {
       items: [
         { key: "admin", label: t("nav.admin"), icon: <SettingOutlined />, path: "/app/admin", adminOnly: true },
         { key: "news-admin", label: t("website.newsAdmin.manageTitle"), icon: <FileTextOutlined />, path: "/app/news-admin", adminOnly: true },
+        {
+          key: "applications-review",
+          label: t("webapp.applicationReview.title"),
+          icon: <FileSearchOutlined />,
+          path: "/app/applications-review",
+          adminOnly: true,
+        },
         { key: "race-configuration", label: t("nav.raceConfig"), icon: <FlagOutlined />, path: "/app/race-configuration", adminOnly: true },
         { key: "points", label: t("nav.points"), icon: <StarOutlined />, path: "/app/points", adminOnly: true },
       ],
@@ -86,6 +99,14 @@ const Sidebar: React.FC = () => {
         { key: "steering-test", label: t("categories.figureDriving"), icon: <DragOutlined />, path: "/app/Category/SteeringTest", adminOnly: true },
         { key: "drag-race", label: t("categories.dragRace"), icon: <AppstoreOutlined />, path: "/app/Category/DragRace", adminOnly: true },
         { key: "braking-test", label: t("categories.brakingTest"), icon: <StopOutlined />, path: "/app/Category/BrakingTest", adminOnly: true },
+      ],
+    },
+    {
+      title: "TV Displays",
+      items: [
+        { key: "tv-leaderboard", label: "Leaderboard TV", icon: <DesktopOutlined />, path: "/app/tv/leaderboard", adminOnly: true },
+        { key: "tv-results", label: "Results TV", icon: <DesktopOutlined />, path: "/app/tv/results", adminOnly: true },
+        { key: "tv-live-data", label: "Live Data TV", icon: <DesktopOutlined />, path: "/app/tv/live-data", adminOnly: true },
       ],
     },
   ];
@@ -105,7 +126,7 @@ const Sidebar: React.FC = () => {
   };
 
   const renderItem = (item: NavItem) => {
-    if (item.adminOnly && !isAuthenticated) return null;
+    if (item.adminOnly && !isWebappAdmin) return null;
     if (item.hideWhenAuth && isAuthenticated) return null;
 
     const active = isActive(item.path);
@@ -147,15 +168,17 @@ const Sidebar: React.FC = () => {
   };
 
   return (
-    <aside
-      className={`
-        fixed top-0 left-0 h-screen z-40 flex flex-col
-        bg-gradient-to-b from-[#0A306D] to-[#0d2451]
-        border-r border-white/5 shadow-xl
-        transition-all duration-300 ease-in-out
-        ${collapsed ? "w-[68px]" : "w-[240px]"}
-      `}
-    >
+    <>
+      {/* Desktop Sidebar */}
+      <aside
+        className={`
+          hidden sm:flex fixed top-0 left-0 h-screen z-40 flex-col
+          bg-gradient-to-b from-[#0A306D] to-[#0d2451]
+          border-r border-white/5 shadow-xl
+          transition-all duration-300 ease-in-out
+          ${collapsed ? "w-[68px]" : "w-[240px]"}
+        `}
+      >
       {/* ── Logo / Brand ── */}
       <div className={`flex items-center gap-3 p-4 border-b border-white/10 ${collapsed ? "justify-center" : ""}`}>
         <img src={Logo} alt="E-ES" className="w-9 h-9 rounded-lg object-contain" />
@@ -171,7 +194,7 @@ const Sidebar: React.FC = () => {
       <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-4 scrollbar-thin">
         {navGroups.map((group) => {
           const visibleItems = group.items.filter(
-            (item) => (!item.adminOnly || isAuthenticated) && (!item.hideWhenAuth || !isAuthenticated)
+            (item) => (!item.adminOnly || isWebappAdmin) && (!item.hideWhenAuth || !isAuthenticated)
           );
           if (visibleItems.length === 0) return null;
 
@@ -207,7 +230,7 @@ const Sidebar: React.FC = () => {
               key: "login",
               label: t("nav.login"),
               icon: <LoginOutlined />,
-              path: "/app/login",
+              path: "/signin",
             })
           : renderItem({
               key: "logout",
@@ -236,6 +259,141 @@ const Sidebar: React.FC = () => {
         </button>
       </div>
     </aside>
+
+    {/* Mobile Header */}
+    <div className="sm:hidden fixed top-0 left-0 right-0 z-40 bg-gradient-to-b from-[#0A306D] to-[#0d2451] border-b border-white/10 h-16 flex items-center px-4">
+      <button
+        onClick={() => setMobileOpen(!mobileOpen)}
+        className="text-white text-xl hover:text-[#4EA9D5] transition-colors"
+      >
+        {mobileOpen ? <CloseOutlined /> : <MenuOutlined />}
+      </button>
+      <img src={Logo} alt="E-ES" className="w-8 h-8 rounded-lg mx-3" />
+      <span className="text-white font-bold">E-ES</span>
+    </div>
+
+    {/* Mobile Drawer Overlay */}
+    {mobileOpen && (
+      <div
+        className="sm:hidden fixed inset-0 bg-black/30 z-30 top-16"
+        onClick={() => setMobileOpen(false)}
+      />
+    )}
+
+    {/* Mobile Drawer */}
+    <div
+      className={`sm:hidden fixed top-16 left-0 h-[calc(100vh-4rem)] w-64 bg-gradient-to-b from-[#0A306D] to-[#0d2451] z-30 flex flex-col overflow-y-auto transition-transform duration-300 ${
+        mobileOpen ? "translate-x-0" : "-translate-x-full"
+      }`}
+    >
+      {/* Nav Groups */}
+      <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-4">
+        {navGroups.map((group) => {
+          const visibleItems = group.items.filter(
+            (item) => (!item.adminOnly || isWebappAdmin) && (!item.hideWhenAuth || !isAuthenticated)
+          );
+          if (visibleItems.length === 0) return null;
+
+          return (
+            <div key={group.title}>
+              <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-white/30">
+                {group.title}
+              </p>
+              <div className="space-y-0.5">
+                {visibleItems.map((item) => {
+                  if (item.adminOnly && !isWebappAdmin) return null;
+                  const active = isActive(item.path);
+                  return (
+                    <button
+                      key={item.key}
+                      onClick={() => {
+                        handleClick(item);
+                        setMobileOpen(false);
+                      }}
+                      className={`
+                        group flex items-center gap-3 w-full rounded-lg text-sm font-medium px-3 py-2.5
+                        transition-all duration-200 outline-none
+                        ${
+                          active
+                            ? "bg-[#4EA9D5]/20 text-[#4EA9D5] shadow-sm shadow-[#4EA9D5]/10"
+                            : "text-white/70 hover:bg-white/10 hover:text-white"
+                        }
+                      `}
+                    >
+                      <span className={`text-lg flex-shrink-0 ${active ? "text-[#4EA9D5]" : "text-white/50 group-hover:text-white/80"}`}>
+                        {item.icon}
+                      </span>
+                      <span className="truncate">{item.label}</span>
+                      {active && (
+                        <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#4EA9D5]" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </nav>
+
+      {/* Bottom Actions */}
+      <div className="border-t border-white/10 px-2 py-3 space-y-0.5">
+        <button
+          onClick={() => {
+            toggleLanguage();
+            setMobileOpen(false);
+          }}
+          className="group flex items-center gap-3 w-full rounded-lg text-sm font-medium px-3 py-2.5 text-white/70 hover:bg-white/10 hover:text-white transition-all duration-200 outline-none"
+        >
+          <span className="text-lg flex-shrink-0 text-white/50 group-hover:text-white/80">
+            <GlobalOutlined />
+          </span>
+          <span>{i18n.language === "lv" ? "English" : "Latviešu"}</span>
+        </button>
+
+        {!isAuthenticated ? (
+          <button
+            onClick={() => {
+              navigate("/signin");
+              setMobileOpen(false);
+            }}
+            className="group flex items-center gap-3 w-full rounded-lg text-sm font-medium px-3 py-2.5 text-white/70 hover:bg-white/10 hover:text-white transition-all duration-200 outline-none"
+          >
+            <span className="text-lg flex-shrink-0 text-white/50 group-hover:text-white/80">
+              <LoginOutlined />
+            </span>
+            <span>{t("nav.login")}</span>
+          </button>
+        ) : (
+          <button
+            onClick={() => {
+              logout();
+              setMobileOpen(false);
+            }}
+            className="group flex items-center gap-3 w-full rounded-lg text-sm font-medium px-3 py-2.5 text-white/70 hover:bg-white/10 hover:text-white transition-all duration-200 outline-none"
+          >
+            <span className="text-lg flex-shrink-0 text-white/50 group-hover:text-white/80">
+              <LogoutOutlined />
+            </span>
+            <span>{t("nav.logout")}</span>
+          </button>
+        )}
+
+        <button
+          onClick={() => {
+            navigate("/");
+            setMobileOpen(false);
+          }}
+          className="group flex items-center gap-3 w-full rounded-lg text-sm font-medium px-3 py-2.5 text-white/70 hover:bg-white/10 hover:text-white transition-all duration-200 outline-none"
+        >
+          <span className="text-lg flex-shrink-0 text-white/50 group-hover:text-white/80">
+            <ArrowLeftOutlined />
+          </span>
+          <span>{t("website.nav.home")}</span>
+        </button>
+      </div>
+    </div>
+    </>
   );
 };
 

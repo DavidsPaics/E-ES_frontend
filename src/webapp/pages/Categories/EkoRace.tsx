@@ -1,5 +1,5 @@
 // src/pages/EkoRace.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Table,
   Button,
@@ -13,6 +13,16 @@ import { ENDPOINT_COMPETITORS, ENDPOINT_COMPETITORS_START_RACE, ENDPOINT_COMPETI
 import { apiFetch } from "@/webapp/utils/api";
 import { fakeCategoryCompetitors } from "@/webapp/data/fakeData";
 import { useTranslation } from 'react-i18next';
+import {
+  addPenalty,
+  getAttemptNo,
+  getPenalty,
+  getTeam,
+  getTimeSpent,
+  getValidity,
+  timeToSeconds,
+  toNumber,
+} from "./resultsTableUtils";
 
 type Competitor = {
   id: number;
@@ -150,52 +160,124 @@ const EkoRace: React.FC = () => {
     }
   };
 
-  // table columns, including per-competitor timer
+  const resultRows = useMemo(() => {
+    const base = competitors.map((rec, index) => {
+      const penalties = getPenalty(rec as any, index);
+      const timeSpent = getTimeSpent(rec as any, tick);
+      const totalTime = addPenalty(timeSpent, penalties);
+      const usedEnergy = toNumber(
+        (rec as any).usedEnergy ?? (rec as any).energy,
+        0.35 + ((rec.id + index) % 6) * 0.08
+      );
+      const massKg = toNumber(
+        (rec as any).massKg ?? (rec as any).mass ?? (rec as any).m,
+        75 + ((rec.id + index) % 7) * 4
+      );
+      const distanceKm = toNumber(
+        (rec as any).distanceKm ?? (rec as any).distance,
+        1.0
+      );
+      const eValue = usedEnergy / Math.max(massKg, 1);
+      const kmPerKwh = distanceKm / Math.max(usedEnergy, 0.001);
+      return {
+        key: rec.id,
+        id: rec.id,
+        team: getTeam(rec as any, `Team ${rec.id}`),
+        timeSpent,
+        avgSpeed: toNumber((rec as any).avgSpeed ?? (rec as any).speed, 22 + ((rec.id + index) % 8) * 1.5),
+        penalties,
+        totalTime,
+        attemptNo: getAttemptNo(rec as any, index, selectedLap),
+        isValid: getValidity(rec as any, index),
+        usedEnergy,
+        efficiencyText: `${eValue.toFixed(4)} kWh/kg | ${kmPerKwh.toFixed(2)} km/1kWh`,
+        raw: rec,
+      };
+    });
+
+    const ranked = [...base].sort((a, b) => {
+      const aSeconds = timeToSeconds(a.totalTime);
+      const bSeconds = timeToSeconds(b.totalTime);
+      if (!Number.isFinite(aSeconds) && !Number.isFinite(bSeconds)) return a.id - b.id;
+      if (!Number.isFinite(aSeconds)) return 1;
+      if (!Number.isFinite(bSeconds)) return -1;
+      return aSeconds - bSeconds;
+    });
+
+    const placeById = new Map<number, number>(ranked.map((entry, index) => [entry.id, index + 1]));
+    return base.map((entry) => ({
+      ...entry,
+      place: placeById.get(entry.id) ?? "-",
+    }));
+  }, [competitors, selectedLap, tick]);
+
   const tableColumns = [
-    {
-      title: "Avatar",
-      dataIndex: "avatar",
-      key: "avatar",
-      width: 64,
-      render: (_: any, rec: Competitor) => <Avatar src={rec.avatar} size={48} />,
-    },
-    {
-      title: "Username",
-      dataIndex: "username",
-      key: "username",
-      sorter: (a: Competitor, b: Competitor) => a.username.localeCompare(b.username),
-    },
     {
       title: "ID",
       dataIndex: "id",
       key: "id",
-      width: 70,
-      sorter: (a: Competitor, b: Competitor) => a.id - b.id,
     },
     {
-      title: "Time",
-      key: "time",
-      width: 120,
-      render: (_: any, rec: Competitor) => {
-        if (rec.finishedAt) {
-          return <span style={{ color: "#40a9ff", fontWeight: "bold" }}>{rec.finishedAt}</span>;
-        }
-        if (rec.startedAt) {
-          const elapsedMs = dayjs(tick).diff(dayjs(rec.startedAt));
-          const mm = String(Math.floor((elapsedMs % 3600000) / 60000)).padStart(2, "0");
-          const ss = String(Math.floor((elapsedMs % 60000) / 1000)).padStart(2, "0");
-          const cs = String(Math.floor((elapsedMs % 1000) / 10)).padStart(2, "0");
-          return `${mm}:${ss}.${cs}`;
-        }
-        return "--:--.--";
-      },
+      title: "Team",
+      dataIndex: "team",
+      key: "team",
+    },
+    {
+      title: "Time spend",
+      dataIndex: "timeSpent",
+      key: "timeSpent",
+    },
+    {
+      title: "Avg speed",
+      dataIndex: "avgSpeed",
+      key: "avgSpeed",
+      render: (value: number) => `${value.toFixed(1)} km/h`,
+    },
+    {
+      title: "Penalties",
+      dataIndex: "penalties",
+      key: "penalties",
+      render: (value: number) => `${value} s`,
+    },
+    {
+      title: "Total time",
+      dataIndex: "totalTime",
+      key: "totalTime",
+    },
+    {
+      title: "Place",
+      dataIndex: "place",
+      key: "place",
+    },
+    {
+      title: "Attempt No",
+      dataIndex: "attemptNo",
+      key: "attemptNo",
+    },
+    {
+      title: "Is valid",
+      dataIndex: "isValid",
+      key: "isValid",
+      render: (value: boolean) => (value ? "Yes" : "No"),
+    },
+    {
+      title: "Used energy",
+      dataIndex: "usedEnergy",
+      key: "usedEnergy",
+      render: (value: number) => `${value.toFixed(3)} kWh`,
+    },
+    {
+      title:
+        "Efficiency (e): patērētā enerģija uz pilnas masas; info: nobraukums ar 1kWh",
+      dataIndex: "efficiencyText",
+      key: "efficiencyText",
     },
     {
       title: "Action",
       key: "action",
-      width: 180,
       align: "center" as const,
-      render: (_: any, rec: Competitor) => {
+      render: (_: any, row: { raw: Competitor }) => {
+        const rec = row.raw;
         if (rec.finishedAt) {
           // Completed
           return <span style={{ color: "#40a9ff", fontWeight: "bold" }}>Finished</span>;
@@ -235,12 +317,12 @@ const EkoRace: React.FC = () => {
       <h1 className="text-2xl font-bold text-white mb-6">⚙️ {t('stages.efficiency')} – {t('categories.efficiencyRace')}</h1>
 
       <div className="flex gap-x-12">
-        <div className="flex flex-col gap-y-4 w-[600px]">
+        <div className="flex-1 min-w-0">
           <h2 className="text-white text-xl font-semibold">{t('raceControl.competitors')}</h2>
           <Table
-            dataSource={competitors}
+            dataSource={resultRows}
             columns={tableColumns}
-            rowKey="id"
+            rowKey="key"
             pagination={false}
             size="middle"
           />
@@ -267,4 +349,6 @@ const EkoRace: React.FC = () => {
 };
 
 export default EkoRace
+
+
 

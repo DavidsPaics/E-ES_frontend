@@ -1,19 +1,23 @@
 import React, { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { UserOutlined } from "@ant-design/icons";
 import Logo from "@/assets/Logo.png";
+import { useAuth } from "@/webapp/authentification/AuthContext";
 
 const Navbar: React.FC = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { t, i18n } = useTranslation();
   const location = useLocation();
+  const { isAuthenticated, logout } = useAuth();
 
   const links = [
     { to: "/", label: t("website.nav.home") },
-    { to: "/about", label: t("website.nav.about") },
-    { to: "/news", label: t("website.nav.news") },
+    // { to: "/about", label: t("website.nav.about") },
+    // { to: "/news", label: t("website.nav.news") },
     { to: "/rules", label: t("website.nav.rules") },
-    { to: "/events", label: t("website.nav.events") },
+    // { to: "/events", label: t("website.nav.events") },
     { to: "/apply", label: t("website.nav.apply") },
   ];
 
@@ -58,12 +62,60 @@ const Navbar: React.FC = () => {
             >
               {i18n.language === "lv" ? "EN" : "LV"}
             </button>
+      
             <Link
               to="/app"
               className="bg-[#0A306D] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#36598B] transition-colors"
             >
               {t("website.nav.goToApp")}
             </Link>
+
+            <div className="relative group">
+              <Link
+                to={isAuthenticated ? "/cabinet" : "/signin"}
+                aria-label={t("website.nav.cabinet", { defaultValue: "Cabinet" })}
+                className={`w-10 h-10 rounded-full border flex items-center justify-center transition-colors ${
+                  isActive("/cabinet")
+                    ? "border-[#4EA9D5] text-[#4EA9D5] bg-[#4EA9D5]/10"
+                    : "border-[#0A306D]/20 text-[#0A306D] hover:text-[#4EA9D5] hover:border-[#4EA9D5]/40"
+                }`}
+              >
+                <UserOutlined />
+              </Link>
+
+              <div
+                className="
+                  absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-lg
+                  opacity-0 invisible group-hover:opacity-100 group-hover:visible
+                  group-focus-within:opacity-100 group-focus-within:visible
+                  transition-all duration-150 z-50 overflow-hidden
+                "
+              >
+                {isAuthenticated ? (
+                  <button
+                    onClick={logout}
+                    className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                  >
+                    {t("website.nav.logout", { defaultValue: "Log out" })}
+                  </button>
+                ) : (
+                  <>
+                    <Link
+                      to="/signin"
+                      className="block px-3 py-2 text-sm text-[#0A306D] hover:bg-gray-50"
+                    >
+                      {t("website.nav.signIn", { defaultValue: "Sign in" })}
+                    </Link>
+                    <Link
+                      to="/signup"
+                      className="block px-3 py-2 text-sm text-[#0A306D] hover:bg-gray-50"
+                    >
+                      {t("website.nav.signUp", { defaultValue: "Sign up" })}
+                    </Link>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Mobile hamburger */}
@@ -80,7 +132,7 @@ const Navbar: React.FC = () => {
 
         {/* Mobile dropdown */}
         {mobileOpen && (
-          <div className="md:hidden pb-4 space-y-1">
+          <div className="md:hidden pb-4 space-y-1 max-h-[calc(100vh-4rem)] overflow-y-auto">
             {links.map((link) => (
               <Link
                 key={link.to}
@@ -97,6 +149,7 @@ const Navbar: React.FC = () => {
               <button onClick={toggleLang} className="text-sm text-[#0A306D] font-medium">
                 {i18n.language === "lv" ? "EN" : "LV"}
               </button>
+              
               <Link
                 to="/app"
                 onClick={() => setMobileOpen(false)}
@@ -104,6 +157,47 @@ const Navbar: React.FC = () => {
               >
                 {t("website.nav.goToApp")}
               </Link>
+
+              <div className="flex items-center gap-2">
+                {isAuthenticated ? (
+                  <>
+                    <Link
+                      to="/cabinet"
+                      onClick={() => setMobileOpen(false)}
+                      aria-label={t("website.nav.cabinet", { defaultValue: "Cabinet" })}
+                      className="w-9 h-9 rounded-full border border-[#0A306D]/20 text-[#0A306D] flex items-center justify-center"
+                    >
+                      <UserOutlined />
+                    </Link>
+                    <button
+                      onClick={() => {
+                        logout();
+                        setMobileOpen(false);
+                      }}
+                      className="text-sm text-red-600 font-medium"
+                    >
+                      {t("website.nav.logout", { defaultValue: "Log out" })}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <Link
+                      to="/signin"
+                      onClick={() => setMobileOpen(false)}
+                      className="text-sm text-[#0A306D] font-medium"
+                    >
+                      {t("website.nav.signIn", { defaultValue: "Sign in" })}
+                    </Link>
+                    <Link
+                      to="/signup"
+                      onClick={() => setMobileOpen(false)}
+                      className="text-sm text-[#0A306D] font-medium"
+                    >
+                      {t("website.nav.signUp", { defaultValue: "Sign up" })}
+                    </Link>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         )}

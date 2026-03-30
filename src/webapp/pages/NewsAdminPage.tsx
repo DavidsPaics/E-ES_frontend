@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
-import { Table, Button, Modal, Input, Space, Tag, Switch, message, Popconfirm, Upload, Tabs } from "antd";
+import React, { useState, useEffect } from "react";
+import { Table, Button, Modal, Input, Space, Tag, Switch, message, Popconfirm, Upload } from "antd";
 import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined, EyeOutlined, FileImageOutlined, FilePdfOutlined, FileOutlined, CloseCircleOutlined } from "@ant-design/icons";
 import "@ant-design/v5-patch-for-react-19";
 import { useTranslation } from "react-i18next";
@@ -9,7 +9,8 @@ import {
   updateArticle,
   deleteArticle,
   type NewsArticle,
-} from "@/website/data/newsStore";
+} from "@/website/pages/data/newsStore";
+import { formatDisplayDate } from "@/utils/dateFormat";
 
 const { TextArea } = Input;
 
@@ -206,6 +207,7 @@ const NewsAdminPage: React.FC = () => {
       dataIndex: "date",
       key: "date",
       width: 120,
+      render: (value: string) => formatDisplayDate(value),
     },
     {
       title: t("website.newsAdmin.tags"),
@@ -268,7 +270,7 @@ const NewsAdminPage: React.FC = () => {
         </h2>
         <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
           <span>{article.author}</span>
-          <span>{new Date(article.date).toLocaleDateString(lang === "lv" ? "lv-LV" : "en-GB")}</span>
+          <span>{formatDisplayDate(article.date)}</span>
         </div>
         <p className="text-gray-600 italic mb-4">{article.summary[lang] || article.summary.en}</p>
         <div className="prose prose-sm max-w-none whitespace-pre-wrap text-gray-800">

@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { getEvents, type CompetitionEvent } from "@/website/data/eventsData";
+import { getEvents, type CompetitionEvent } from "@/website/pages/data/eventsData";
+import { formatDisplayDate } from "@/utils/dateFormat";
 
 const EventsPage: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -26,7 +27,6 @@ const EventsPage: React.FC = () => {
 
   return (
     <div>
-      {/* Hero */}
       <section className="bg-gradient-to-br from-[#0A306D] to-[#36598B] text-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="text-4xl md:text-5xl font-extrabold mb-4">{t("website.events.title")}</h1>
@@ -34,7 +34,6 @@ const EventsPage: React.FC = () => {
         </div>
       </section>
 
-      {/* Filters */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex flex-wrap gap-2 mb-8">
           {(["all", "upcoming", "ongoing", "completed"] as const).map((f) => (
@@ -52,7 +51,6 @@ const EventsPage: React.FC = () => {
           ))}
         </div>
 
-        {/* Events List */}
         {events.length === 0 ? (
           <p className="text-gray-400 italic text-center py-16">{t("website.events.noEvents")}</p>
         ) : (
@@ -63,20 +61,11 @@ const EventsPage: React.FC = () => {
                 className="bg-white rounded-2xl border border-gray-200 p-6 md:p-8 shadow-sm hover:shadow-md transition-shadow"
               >
                 <div className="flex flex-col md:flex-row md:items-start gap-6">
-                  {/* Date badge */}
                   <div className="flex-shrink-0 bg-[#0A306D] text-white rounded-xl p-4 text-center min-w-[100px]">
-                    <div className="text-3xl font-bold">
-                      {new Date(evt.date).getDate()}
-                    </div>
-                    <div className="text-sm text-white/70">
-                      {new Date(evt.date).toLocaleDateString(lang === "lv" ? "lv-LV" : "en-GB", {
-                        month: "short",
-                        year: "numeric",
-                      })}
-                    </div>
+                    <div className="text-3xl font-bold">{formatDisplayDate(evt.date).split(".")[0]}</div>
+                    <div className="text-sm text-white/70">{formatDisplayDate(evt.date)}</div>
                   </div>
 
-                  {/* Content */}
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <h2 className="text-xl font-bold text-[#0A306D]">
@@ -88,24 +77,10 @@ const EventsPage: React.FC = () => {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 mb-3">
-                      <span>📍 {evt.location[lang] || evt.location.en}</span>
+                      <span>{evt.location[lang] || evt.location.en}</span>
                       <span>
-                        📅{" "}
-                        {new Date(evt.date).toLocaleDateString(lang === "lv" ? "lv-LV" : "en-GB", {
-                          year: "numeric",
-                          month: "long",
-                          day: "numeric",
-                        })}
-                        {evt.endDate && (
-                          <>
-                            {" – "}
-                            {new Date(evt.endDate).toLocaleDateString(lang === "lv" ? "lv-LV" : "en-GB", {
-                              year: "numeric",
-                              month: "long",
-                              day: "numeric",
-                            })}
-                          </>
-                        )}
+                        {formatDisplayDate(evt.date)}
+                        {evt.endDate && <> - {formatDisplayDate(evt.endDate)}</>}
                       </span>
                     </div>
 

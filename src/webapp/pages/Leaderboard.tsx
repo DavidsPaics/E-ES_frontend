@@ -240,25 +240,26 @@ const Leaderboard: React.FC = () => {
     const columns = makeColumns(categories);
 
     return (
-      <div className="min-h-screen flex-1 flex-col pb-32 fixed inset-1 overflow-auto">
-        <div className="flex justify-end mb-2">
+      <div className="fixed inset-0 z-50 bg-[#0A306D] overflow-auto sm:mt-0 mt-16">
+        <div className="flex justify-end mb-2 p-4">
           <Button
             icon={<FullscreenExitOutlined />}
             onClick={() => setExpandedGroup(null)}
-            style={{ background: "transparent", border: "none" }}
+            style={{ background: "transparent", border: "none", color: "white" }}
           />
         </div>
-        <Title level={3} style={{ textAlign: "center", marginBottom: 16 }}>
+        <Title level={3} style={{ textAlign: "center", marginBottom: 16, color: "white" }}>
           🏆 Leaderboard – Age Group “{expandedGroup}”
         </Title>
-        <Table<LeaderboardEntry>
-          dataSource={entries}
-          columns={columns}
-          rowKey="ID"
-          pagination={false}
-          size="middle"
-          scroll={{ y: "100%" }}
-        />
+        <div className="px-6 pb-12">
+          <Table<LeaderboardEntry>
+            dataSource={entries}
+            columns={columns}
+            rowKey="ID"
+            pagination={false}
+            size="middle"
+          />
+        </div>
       </div>
     );
   }
@@ -282,7 +283,7 @@ const Leaderboard: React.FC = () => {
                 className="bg-[#36598B]/30 backdrop-blur-md p-6 rounded-xl shadow-lg relative"
               >
                 <div className="flex items-center justify-between mb-4">
-                  <Title level={4} style={{ margin: 0 }}>
+                  <Title level={4} style={{ margin: 0, color: "white" }}>
                     Age Group: “{grp}”
                   </Title>
                   <Button

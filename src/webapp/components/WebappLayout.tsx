@@ -9,7 +9,7 @@ function LayoutContent() {
     <div className="min-h-screen bg-[#0A306D] text-[#FCFDFD]">
       <Sidebar />
       <main
-        className="min-h-screen transition-all duration-300 ease-in-out"
+        className="min-h-screen transition-all duration-300 ease-in-out pt-16 sm:pt-0"
         style={{ marginLeft: sidebarWidth }}
       >
         <Outlet />

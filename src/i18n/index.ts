@@ -18,9 +18,10 @@ i18n
       escapeValue: false, // React already escapes
     },
     detection: {
-      order: ["localStorage", "navigator"],
+      order: ["localStorage", "htmlTag"],
       caches: ["localStorage"],
     },
+    lng: "lv",
   });
 
 export default i18n;

@@ -8,7 +8,6 @@ import rulesEn from "@/assets/pdf/Energy Efficiency Competition 2026.pdf";
 
 const RulesPage: React.FC = () => {
   const { t, i18n } = useTranslation();
-  const lang = i18n.language as "en" | "lv";
 
   const pdfFiles = [
     {

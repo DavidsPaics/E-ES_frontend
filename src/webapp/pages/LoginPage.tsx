@@ -18,7 +18,7 @@ const LoginPage = () => {
   const handleLoginFinish: FormProps<FieldType>["onFinish"] = async (values) => {
     try {
       await login(values.username!, values.password!);
-      navigate("/dashboard"); // or /protected if your route is named like that
+      navigate("/cabinet");
     } catch {
       alert("Login failed");
     }

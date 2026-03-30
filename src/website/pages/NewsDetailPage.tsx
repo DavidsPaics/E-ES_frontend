@@ -3,7 +3,8 @@ import { useParams, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { FileImageOutlined, FilePdfOutlined, FileOutlined } from "@ant-design/icons";
 import "@ant-design/v5-patch-for-react-19";
-import { getArticle } from "@/website/data/newsStore";
+import { getArticle } from "@/website/pages/data/newsStore";
+import { formatDisplayDate } from "@/utils/dateFormat";
 
 const NewsDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -59,11 +60,7 @@ const NewsDetailPage: React.FC = () => {
           {t("website.news.by")} <strong className="text-gray-600">{article.author}</strong>
         </span>
         <span>
-          {new Date(article.date).toLocaleDateString(lang === "lv" ? "lv-LV" : "en-GB", {
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          })}
+          {formatDisplayDate(article.date)}
         </span>
       </div>
 

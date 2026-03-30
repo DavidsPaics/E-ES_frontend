@@ -9,8 +9,9 @@ type MenuItem = Required<MenuProps>['items'][number];
 
 const MainMenu: React.FC = () => {
   const navigate = useNavigate();
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, currentUser, logout } = useAuth();
   const { t, i18n } = useTranslation();
+  const isWebappAdmin = currentUser?.role === "admin" || currentUser?.role === "super_admin";
 
   const toggleLanguage = () => {
     i18n.changeLanguage(i18n.language === 'lv' ? 'en' : 'lv');
@@ -22,7 +23,7 @@ const MainMenu: React.FC = () => {
         navigate('/app');
         break;
       case 'login':
-        navigate('/app/login');
+        navigate('/signin');
         break;
       case 'leaderboard':
         navigate('/app/leaderboard');
@@ -97,18 +98,18 @@ const MainMenu: React.FC = () => {
         { key: 'test', label: t('nav.test') },
         { key: 'palette', label: t('nav.palette') },
         { key: 'login', label: t('nav.login'), disabled: isAuthenticated },
-        isAuthenticated && { key: 'admin', label: t('nav.admin') },
-        isAuthenticated && { key: 'news-admin', label: t('website.newsAdmin.header') },
+        isWebappAdmin && { key: 'admin', label: t('nav.admin') },
+        isWebappAdmin && { key: 'news-admin', label: t('website.newsAdmin.header') },
         isAuthenticated && { key: 'logout', label: t('nav.logout') },
-        isAuthenticated && { key: 'scoring', label: t('nav.scoring') },
-        isAuthenticated && { key: 'race-configuration', label: t('nav.raceConfig') },
-        isAuthenticated && { key: 'eko-race', label: t('categories.efficiencyRace') },
-        isAuthenticated && { key: 'main-race', label: t('categories.finalRace') },
-        isAuthenticated && { key: 'shuttle-run', label: t('categories.shuttleRun') },
-        isAuthenticated && { key: 'steering-test', label: t('categories.figureDriving') },
-        isAuthenticated && { key: 'drag-race', label: t('categories.dragRace') },
-        isAuthenticated && { key: 'braking-test', label: t('categories.brakingTest') },
-        isAuthenticated && { key: 'points', label: t('nav.points') },
+        isWebappAdmin && { key: 'scoring', label: t('nav.scoring') },
+        isWebappAdmin && { key: 'race-configuration', label: t('nav.raceConfig') },
+        isWebappAdmin && { key: 'eko-race', label: t('categories.efficiencyRace') },
+        isWebappAdmin && { key: 'main-race', label: t('categories.finalRace') },
+        isWebappAdmin && { key: 'shuttle-run', label: t('categories.shuttleRun') },
+        isWebappAdmin && { key: 'steering-test', label: t('categories.figureDriving') },
+        isWebappAdmin && { key: 'drag-race', label: t('categories.dragRace') },
+        isWebappAdmin && { key: 'braking-test', label: t('categories.brakingTest') },
+        isWebappAdmin && { key: 'points', label: t('nav.points') },
         { key: 'lang', label: t('nav.langSwitch') },
         { key: 'website', label: '← ' + t('website.nav.home') },
       ].filter(Boolean) as MenuItem[],

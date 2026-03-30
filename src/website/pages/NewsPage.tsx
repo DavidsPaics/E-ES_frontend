@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { getArticles, type NewsArticle } from "@/website/data/newsStore";
+import { getArticles, type NewsArticle } from "@/website/pages/data/newsStore";
+import { formatDisplayDate } from "@/utils/dateFormat";
 
 const NewsPage: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -97,11 +98,7 @@ const NewsPage: React.FC = () => {
                 <div className="flex items-center justify-between text-xs text-gray-400">
                   <span>{article.author}</span>
                   <span>
-                    {new Date(article.date).toLocaleDateString(lang === "lv" ? "lv-LV" : "en-GB", {
-                      year: "numeric",
-                      month: "short",
-                      day: "numeric",
-                    })}
+                    {formatDisplayDate(article.date)}
                   </span>
                 </div>
               </div>

@@ -1,5 +1,5 @@
 // src/pages/MainRace.tsx
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Table,
   Button,
@@ -14,6 +14,14 @@ import { ENDPOINT_COMPETITORS, ENDPOINT_COMPETITORS_START_RACE, ENDPOINT_COMPETI
 import { apiFetch } from "@/webapp/utils/api";
 import { fakeCategoryCompetitors } from "@/webapp/data/fakeData";
 import { useTranslation } from 'react-i18next';
+import {
+  addPenalty,
+  getPenalty,
+  getTeam,
+  getTimeSpent,
+  timeToSeconds,
+  toNumber,
+} from "./resultsTableUtils";
 
 type Competitor = {
   id: number;
@@ -177,53 +185,87 @@ const MainRace: React.FC = () => {
     },
   };
 
+  const resultRows = useMemo(() => {
+    const base = competitors.map((rec, index) => {
+      const penalties = getPenalty(rec as any, index);
+      const timeSpent = getTimeSpent(rec as any, tick);
+      const totalTime = addPenalty(timeSpent, penalties);
+      return {
+        key: rec.id,
+        id: rec.id,
+        team: getTeam(rec as any, `Team ${rec.id}`),
+        timeSpent,
+        avgSpeed: toNumber((rec as any).avgSpeed ?? (rec as any).speed, 26 + ((rec.id + index) % 9) * 1.7),
+        penalties,
+        totalTime,
+        raw: rec,
+      };
+    });
+
+    const ranked = [...base].sort((a, b) => {
+      const aSeconds = timeToSeconds(a.totalTime);
+      const bSeconds = timeToSeconds(b.totalTime);
+      if (!Number.isFinite(aSeconds) && !Number.isFinite(bSeconds)) return a.id - b.id;
+      if (!Number.isFinite(aSeconds)) return 1;
+      if (!Number.isFinite(bSeconds)) return -1;
+      return aSeconds - bSeconds;
+    });
+
+    const placeById = new Map<number, number>(
+      ranked.map((entry, index) => [entry.id, index + 1])
+    );
+
+    return base.map((entry) => ({
+      ...entry,
+      place: placeById.get(entry.id) ?? "-",
+    }));
+  }, [competitors, tick]);
+
   // table columns, including per-competitor timer and finish button
   const tableColumns = [
-    
-    {
-      title: "Avatar",
-      dataIndex: "avatar",
-      key: "avatar",
-      width: 64,
-      render: (_: any, rec: Competitor) => <Avatar src={rec.avatar} size={48} />,
-    },
-    {
-      title: "Username",
-      dataIndex: "username",
-      key: "username",
-      sorter: (a: Competitor, b: Competitor) => a.username.localeCompare(b.username),
-    },
     {
       title: "ID",
       dataIndex: "id",
       key: "id",
-      width: 70,
-      sorter: (a: Competitor, b: Competitor) => a.id - b.id,
     },
     {
-      title: "Time",
-      key: "time",
-      width: 120,
-      render: (_: any, rec: Competitor) => {
-        if (rec.finishedAt) {
-          return <span style={{ color: "#40a9ff", fontWeight: "bold" }}>{rec.finishedAt}</span>;
-        }
-        if (rec.startedAt) {
-          const elapsedMs = dayjs(tick).diff(dayjs(rec.startedAt));
-          const mm = String(Math.floor((elapsedMs % 3600000) / 60000)).padStart(2, "0");
-          const ss = String(Math.floor((elapsedMs % 60000) / 1000)).padStart(2, "0");
-          const cs = String(Math.floor((elapsedMs % 1000) / 10)).padStart(2, "0");
-          return `${mm}:${ss}.${cs}`;
-        }
-        return "--:--.--";
-      },
+      title: "Team",
+      dataIndex: "team",
+      key: "team",
+    },
+    {
+      title: "Time spend",
+      dataIndex: "timeSpent",
+      key: "timeSpent",
+    },
+    {
+      title: "Avg speed",
+      dataIndex: "avgSpeed",
+      key: "avgSpeed",
+      render: (value: number) => `${value.toFixed(1)} km/h`,
+    },
+    {
+      title: "Penalties",
+      dataIndex: "penalties",
+      key: "penalties",
+      render: (value: number) => `${value} s`,
+    },
+    {
+      title: "Total time",
+      dataIndex: "totalTime",
+      key: "totalTime",
+    },
+    {
+      title: "Place",
+      dataIndex: "place",
+      key: "place",
     },
     {
       title: "Action",
       key: "action",
-      width: 140,
       align: "center" as const,
-      render: (_: any, rec: Competitor) => {
+      render: (_: any, row: { raw: Competitor }) => {
+        const rec = row.raw;
         if (rec.finishedAt) {
           return <span style={{ color: "#40a9ff", fontWeight: "bold" }}>Finished</span>;
         }
@@ -251,12 +293,12 @@ const MainRace: React.FC = () => {
       <h1 className="text-2xl font-bold text-white mb-6">⚙️ {t('stages.final')} – {t('categories.finalRace')}</h1>
 
       <div className="flex gap-x-12">
-        <div className="flex flex-col gap-y-4 w-[600px]">
+        <div className="flex-1 min-w-0">
           <h2 className="text-white text-xl font-semibold">{t('raceControl.competitors')}</h2>
           <Table
-            dataSource={competitors}
+            dataSource={resultRows}
             columns={tableColumns}
-            rowKey="id"
+            rowKey="key"
             pagination={false}
             size="middle"
             rowSelection={rowSelection}
@@ -291,4 +333,6 @@ const MainRace: React.FC = () => {
 };
 
 export default MainRace;
+
+
 

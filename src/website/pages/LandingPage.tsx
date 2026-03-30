@@ -3,8 +3,8 @@ import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Carousel } from "antd";
 import "@ant-design/v5-patch-for-react-19";
-import { getArticles, type NewsArticle } from "@/website/data/newsStore";
-import { getEvents, type CompetitionEvent } from "@/website/data/eventsData";
+import { getArticles } from "@/website/pages/data/newsStore";
+import { getEvents } from "@/website/pages/data/eventsData";
 import Logo from "@/assets/Logo.png";
 
 // Event photos
@@ -22,8 +22,8 @@ import photo10 from "@/assets/photo/IMG_0550.jpg";
 const eventPhotos = [photo1, photo2, photo3, photo4, photo5, photo6, photo7, photo8, photo9, photo10];
 
 const LandingPage: React.FC = () => {
-  const { t, i18n } = useTranslation();
-  const lang = i18n.language as "en" | "lv";
+  const { t } = useTranslation();
+
   const articles = getArticles(true).slice(0, 3);
   const events = getEvents("upcoming").slice(0, 3);
 
@@ -86,20 +86,7 @@ const LandingPage: React.FC = () => {
               <p className="text-lg md:text-xl text-white/85 mb-8 max-w-2xl drop-shadow-md">
                 {t("website.landing.heroSubtitle")}
               </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
-                <Link
-                  to="/apply"
-                  className="bg-white text-[#0A306D] px-8 py-3 rounded-xl text-lg font-bold hover:bg-gray-100 transition-colors shadow-lg"
-                >
-                  {t("website.landing.heroCta")}
-                </Link>
-                <Link
-                  to="/about"
-                  className="border-2 border-white/50 text-white px-8 py-3 rounded-xl text-lg font-medium hover:bg-white/10 transition-colors"
-                >
-                  {t("website.landing.learnMore")}
-                </Link>
-              </div>
+            
             </div>
             <div className="flex-shrink-0">
               <img src={Logo} alt="E-ES Logo" className="w-48 md:w-64 drop-shadow-2xl" />
@@ -133,7 +120,7 @@ const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* ─── Upcoming Events ───────────────────────────── */}
+      {/* ─── Upcoming Events ─── Temporarily hidden
       {events.length > 0 && (
         <section className="py-20">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -155,11 +142,7 @@ const LandingPage: React.FC = () => {
                   <div className="flex items-center gap-2 text-sm text-[#4EA9D5] font-medium mb-3">
                     <span>📅</span>
                     <span>
-                      {new Date(evt.date).toLocaleDateString(lang === "lv" ? "lv-LV" : "en-GB", {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                      })}
+                      {formatDisplayDate(evt.date)}
                     </span>
                   </div>
                   <h3 className="text-lg font-bold text-[#0A306D] mb-2">
@@ -177,8 +160,9 @@ const LandingPage: React.FC = () => {
           </div>
         </section>
       )}
+      */}
 
-      {/* ─── Latest News ───────────────────────────────── */}
+      {/* ─── Latest News ─── Temporarily hidden
       {articles.length > 0 && (
         <section className="py-20 bg-gray-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -225,7 +209,7 @@ const LandingPage: React.FC = () => {
                       {article.summary[lang] || article.summary.en}
                     </p>
                     <div className="text-xs text-gray-400 mt-3">
-                      {new Date(article.date).toLocaleDateString(lang === "lv" ? "lv-LV" : "en-GB")}
+                      {formatDisplayDate(article.date)}
                     </div>
                   </div>
                 </Link>
@@ -234,6 +218,7 @@ const LandingPage: React.FC = () => {
           </div>
         </section>
       )}
+      */}
 
       {/* ─── CTA Section ───────────────────────────────── */}
       <section className="py-20 bg-gradient-to-r from-[#0A306D] to-[#36598B] text-white">

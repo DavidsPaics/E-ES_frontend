@@ -1,6 +1,7 @@
 // src/pages/LiveDataPage.tsx
 import React, { useEffect, useState, useRef } from "react";
-import { Table, Alert, Tag, Avatar } from "antd";
+import { Table, Alert, Tag, Avatar, Button } from "antd";
+import { FullscreenExitOutlined, FullscreenOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
@@ -55,6 +56,7 @@ const LiveDataPage: React.FC = () => {
   const { t } = useTranslation();
   const [data, setData] = useState<Row[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [expandedView, setExpandedView] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectAttempts = useRef(0);
   const reconnectTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -184,6 +186,51 @@ const LiveDataPage: React.FC = () => {
 
   if (error) return <Alert type="error" message="Error" description={error} />;
 
+  // Fullscreen table view
+  if (expandedView) {
+    const columns: ColumnsType<Row> = [
+      {
+        title: "Status",
+        dataIndex: "status",
+        key: "status",
+        render: (s) => {
+          const color = s === "online" ? "green" : s === "offline" ? "red" : "orange";
+          return <Tag color={color}>{s.toUpperCase()}</Tag>;
+        },
+      },
+      { title: "Avatar", dataIndex: "avatar", key: "avatar", render: (url) => <Avatar src={url} /> },
+      { title: "# Pos", dataIndex: "position", key: "position", sorter: (a, b) => a.position - b.position },
+      { title: "ID", dataIndex: "id", key: "id", sorter: (a, b) => a.id - b.id },
+      { title: "Username", dataIndex: "username", key: "username", sorter: (a, b) => a.username.localeCompare(b.username) },
+      { title: "Spd (km/h)", dataIndex: "spd", key: "spd", sorter: (a, b) => a.spd - b.spd },
+      { title: "Power (W)", dataIndex: "power", key: "power", sorter: (a, b) => a.power - b.power },
+      { title: "Accel.", dataIndex: "acceleration", key: "acceleration", sorter: (a, b) => a.acceleration - b.acceleration },
+      { title: "Voltage", dataIndex: "voltage", key: "voltage", render: (v) => <Battery voltage={v} /> },
+      {
+        title: "Last update",
+        dataIndex: "updatedAt",
+        key: "updatedAt",
+        render: (u: string) => formatDistance(new Date(u), new Date(), { addSuffix: true }),
+      },
+    ];
+
+    return (
+      <div className="fixed inset-0 z-50 bg-[#0A306D] overflow-auto sm:mt-0 mt-16">
+        <div className="flex justify-end p-4 border-b border-white/10">
+          <Button
+            icon={<FullscreenExitOutlined />}
+            onClick={() => setExpandedView(false)}
+            style={{ background: "transparent", border: "none", color: "white" }}
+          />
+        </div>
+        <h2 className="text-2xl font-bold text-white px-6 py-4">{t('liveData.header')}</h2>
+        <div className="px-6 pb-12">
+          <Table<Row> dataSource={data} columns={columns} pagination={false} size="small" rowKey="key" />
+        </div>
+      </div>
+    );
+  }
+
   const makeAvatarIcon = (url: string) =>
     L.divIcon({
       html: `<div style="width:40px;height:40px;border:2px solid white;border-radius:50%;overflow:hidden;"><img src="${url}" style="width:100%;height:100%;object-fit:cover"/></div>`,
@@ -248,7 +295,15 @@ const LiveDataPage: React.FC = () => {
               ))}
             </MapContainer>
           </div>
-          <div className="backdrop-blur-md rounded-xl shadow overflow-auto" style={{ backgroundColor: 'rgba(166, 193, 204, 0.35)' }}>
+          <div className="backdrop-blur-md rounded-xl shadow overflow-auto flex flex-col" style={{ backgroundColor: 'rgba(166, 193, 204, 0.35)' }}>
+            <div className="flex justify-end p-2">
+              <Button
+                size="small"
+                icon={<FullscreenOutlined />}
+                onClick={() => setExpandedView(true)}
+                style={{ background: "transparent", border: "none" }}
+              />
+            </div>
             <Table<Row> dataSource={data} columns={columns} pagination={false} size="small" rowKey="key" />
           </div>
       </div>

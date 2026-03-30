@@ -52,3 +52,33 @@ export default tseslint.config({
   },
 })
 ```
+
+## Docker
+
+Build and run with Docker:
+
+```bash
+docker build -t e-es-frontend .
+docker run --rm -p 8080:80 e-es-frontend
+```
+
+Open http://localhost:8080
+
+Set API base URL at build time:
+
+```bash
+docker build -t e-es-frontend --build-arg VITE_API_BASE_URL=https://your-api.example.com .
+```
+
+Or with compose:
+
+```bash
+VITE_API_BASE_URL=https://your-api.example.com docker compose up --build
+```
+
+PowerShell equivalent:
+
+```powershell
+$env:VITE_API_BASE_URL="https://your-api.example.com"
+docker compose up --build
+```

@@ -1,15 +1,17 @@
 
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/webapp/authentification/AuthContext";
 import type { JSX } from "react";
+import type { UserRole } from "@/shared/cabinet/store";
 
 // Webapp pages
-import LoginPage from "@/webapp/pages/LoginPage";
-import MainPage from "@/webapp/pages/MainPage";
 import AdminPanel from "@/webapp/pages/AdminPanel";
 import Leaderboard from "@/webapp/pages/Leaderboard";
 import ResultsPage from "@/webapp/pages/ResultsPage";
 import LiveDataPage from "@/webapp/pages/LiveDataPage";
+import LeaderboardTV from "@/webapp/pages/LeaderboardTV";
+import ResultsTV from "@/webapp/pages/ResultsTV";
+import LiveDataTV from "@/webapp/pages/LiveDataTV";
 import Test from "@/webapp/pages/Test";
 import EkoRace from "@/webapp/pages/Categories/EkoRace";
 import MainRace from "@/webapp/pages/Categories/MainRace";
@@ -21,6 +23,7 @@ import RaceConfiguration from "@/webapp/pages/RaceConfiguration";
 import Points from "@/webapp/pages/Points";
 import ColorPalette from "@/webapp/pages/ColorPalette";
 import NewsAdminPage from "@/webapp/pages/NewsAdminPage";
+import ApplicationReviewPage from "@/webapp/pages/ApplicationReviewPage";
 import WebappLayout from "@/webapp/components/WebappLayout.tsx";
 
 // Website pages
@@ -32,10 +35,41 @@ import NewsDetailPage from "@/website/pages/NewsDetailPage";
 import RulesPage from "@/website/pages/RulesPage";
 import EventsPage from "@/website/pages/EventsPage";
 import ApplicationPage from "@/website/pages/ApplicationPage";
+import TeamPublicPage from "@/website/pages/TeamPublicPage";
+import CabinetPage from "@/website/pages/CabinetPage";
+import SignInPage from "@/website/pages/SignInPage";
+import SignUpPage from "@/website/pages/SignUpPage";
 
 function PrivateRoute({ children }: { children: JSX.Element }) {
   const { isAuthenticated } = useAuth();
-  return isAuthenticated ? children : <Navigate to="/app/login" />;
+  const location = useLocation();
+  return isAuthenticated
+    ? children
+    : <Navigate to="/signin" state={{ from: location.pathname }} replace />;
+}
+
+const WEBAPP_ADMIN_ROLES: UserRole[] = ["admin", "super_admin"];
+
+function RoleRoute({
+  children,
+  allowedRoles,
+  redirectTo = "/",
+}: {
+  children: JSX.Element;
+  allowedRoles: UserRole[];
+  redirectTo?: string;
+}) {
+  const { isAuthenticated, currentUser } = useAuth();
+  const location = useLocation();
+
+  if (!isAuthenticated) {
+    return <Navigate to="/signin" state={{ from: location.pathname }} replace />;
+  }
+
+  if (!currentUser) return null;
+  if (!allowedRoles.includes(currentUser.role)) return <Navigate to={redirectTo} replace />;
+
+  return children;
 }
 
 function App(): JSX.Element {
@@ -52,28 +86,37 @@ function App(): JSX.Element {
             <Route path="rules" element={<RulesPage />} />
             <Route path="events" element={<EventsPage />} />
             <Route path="apply" element={<ApplicationPage />} />
+            <Route path="team/:teamId" element={<TeamPublicPage />} />
+            <Route path="signin" element={<SignInPage />} />
+            <Route path="signup" element={<SignUpPage />} />
+            <Route path="cabinet" element={<PrivateRoute><CabinetPage /></PrivateRoute>} />
           </Route>
 
           {/* ── Webapp (scoring / admin tool) ── */}
           <Route path="app" element={<WebappLayout />}>
-            <Route index element={<MainPage />} />
-            <Route path="login" element={<LoginPage />} />
+            <Route index element={<Navigate to="leaderboard" replace />} />
+            <Route path="login" element={<Navigate to="/signin" />} />
             <Route path="leaderboard" element={<Leaderboard />} />
             <Route path="results" element={<ResultsPage />} />
             <Route path="live-data" element={<LiveDataPage />} />
             <Route path="test" element={<Test />} />
             <Route path="palette" element={<ColorPalette />} />
             {/* Protected */}
-            <Route path="admin" element={<PrivateRoute><AdminPanel /></PrivateRoute>} />
-            <Route path="news-admin" element={<PrivateRoute><NewsAdminPage /></PrivateRoute>} />
-            <Route path="Category/EkoRace" element={<PrivateRoute><EkoRace /></PrivateRoute>} />
-            <Route path="Category/MainRace" element={<PrivateRoute><MainRace /></PrivateRoute>} />
-            <Route path="Category/ShuttleRun" element={<PrivateRoute><ShuttleRun /></PrivateRoute>} />
-            <Route path="Category/SteeringTest" element={<PrivateRoute><SteeringTest /></PrivateRoute>} />
-            <Route path="Category/DragRace" element={<PrivateRoute><DragRace /></PrivateRoute>} />
-            <Route path="Category/BrakingTest" element={<PrivateRoute><BrakingTest /></PrivateRoute>} />
-            <Route path="race-configuration" element={<PrivateRoute><RaceConfiguration /></PrivateRoute>} />
-            <Route path="points" element={<PrivateRoute><Points /></PrivateRoute>} />
+            <Route path="admin" element={<RoleRoute allowedRoles={WEBAPP_ADMIN_ROLES} redirectTo="/app/leaderboard"><AdminPanel /></RoleRoute>} />
+            <Route path="news-admin" element={<RoleRoute allowedRoles={WEBAPP_ADMIN_ROLES} redirectTo="/app/leaderboard"><NewsAdminPage /></RoleRoute>} />
+            <Route path="applications-review" element={<RoleRoute allowedRoles={WEBAPP_ADMIN_ROLES} redirectTo="/app/leaderboard"><ApplicationReviewPage /></RoleRoute>} />
+            <Route path="Category/EkoRace" element={<RoleRoute allowedRoles={WEBAPP_ADMIN_ROLES} redirectTo="/app/leaderboard"><EkoRace /></RoleRoute>} />
+            <Route path="Category/MainRace" element={<RoleRoute allowedRoles={WEBAPP_ADMIN_ROLES} redirectTo="/app/leaderboard"><MainRace /></RoleRoute>} />
+            <Route path="Category/ShuttleRun" element={<RoleRoute allowedRoles={WEBAPP_ADMIN_ROLES} redirectTo="/app/leaderboard"><ShuttleRun /></RoleRoute>} />
+            <Route path="Category/SteeringTest" element={<RoleRoute allowedRoles={WEBAPP_ADMIN_ROLES} redirectTo="/app/leaderboard"><SteeringTest /></RoleRoute>} />
+            <Route path="Category/DragRace" element={<RoleRoute allowedRoles={WEBAPP_ADMIN_ROLES} redirectTo="/app/leaderboard"><DragRace /></RoleRoute>} />
+            <Route path="Category/BrakingTest" element={<RoleRoute allowedRoles={WEBAPP_ADMIN_ROLES} redirectTo="/app/leaderboard"><BrakingTest /></RoleRoute>} />
+            <Route path="race-configuration" element={<RoleRoute allowedRoles={WEBAPP_ADMIN_ROLES} redirectTo="/app/leaderboard"><RaceConfiguration /></RoleRoute>} />
+            <Route path="points" element={<RoleRoute allowedRoles={WEBAPP_ADMIN_ROLES} redirectTo="/app/leaderboard"><Points /></RoleRoute>} />
+            {/* TV Display Routes - Admin Only */}
+            <Route path="tv/leaderboard" element={<RoleRoute allowedRoles={WEBAPP_ADMIN_ROLES} redirectTo="/app/leaderboard"><LeaderboardTV /></RoleRoute>} />
+            <Route path="tv/results" element={<RoleRoute allowedRoles={WEBAPP_ADMIN_ROLES} redirectTo="/app/leaderboard"><ResultsTV /></RoleRoute>} />
+            <Route path="tv/live-data" element={<RoleRoute allowedRoles={WEBAPP_ADMIN_ROLES} redirectTo="/app/leaderboard"><LiveDataTV /></RoleRoute>} />
           </Route>
 
           {/* Fallback */}
