@@ -7,7 +7,7 @@
 //   VITE_MAPTILER_KEY=your-key
 
 const env = import.meta.env;
-export const BASE_URL = env.VITE_API_BASE_URL ?? "https://e-es.lv";
+export const BASE_URL = env.VITE_API_BASE_URL ?? "https://e-es.lvvv";
 
 // Auth endpoints
 export const ENDPOINT_AUTH_LOGIN = `${BASE_URL}/api/login`;

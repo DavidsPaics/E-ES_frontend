@@ -12,6 +12,7 @@ export interface TeamMember {
   phone: string;
   email: string;
   role: MemberRole;
+  secondaryRole?: "pilot" | "reserve_pilot"; // For team_leader who is also pilot/reserve
   classOrYear?: string;
 }
 

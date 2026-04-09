@@ -27,13 +27,18 @@ body {
   color: #4EA9D5 !important;
 }
 
-/* Ant Design form labels & general text on dark backgrounds */
-.ant-form-item-label > label {
+/* Ant Design form labels on dark backgrounds (webapp) */
+.dark-form .ant-form-item-label > label {
   color: #FCFDFD !important;
 }
 .ant-table-thead > tr > th {
   color: #FCFDFD !important;
   background-color: rgba(10, 48, 109, 0.6) !important;
+}
+
+/* Registration modal - ensure dark text on white background */
+.registration-modal .ant-form-item-label > label {
+  color: #0A306D !important;
 }
 
 /* Ant Design Tabs on dark backgrounds */

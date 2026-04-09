@@ -3,15 +3,12 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import {
   Alert,
-  Avatar,
   Button,
   Input,
   Modal,
-  Space,
   Spin,
   Table,
   Tag,
-  Typography,
 } from "antd";
 import {
   CheckCircleOutlined,
@@ -19,23 +16,15 @@ import {
   FormOutlined,
   SearchOutlined,
   SyncOutlined,
-  UserOutlined,
   WarningOutlined,
 } from "@ant-design/icons";
 import "@ant-design/v5-patch-for-react-19";
 import { ENDPOINT_APPLICATIONS } from "@/webapp/config/endpoints";
 import RegistrationForm from "../components/RegistrationForm";
 import { formatDisplayDate } from "@/utils/dateFormat";
-import {
-  ensureCabinetSeeded,
-  getAllTeams,
-  getUsersByTeam,
-  type PublicUserRecord,
-  type TeamRecord,
-  type VehicleDocument,
-} from "@/shared/cabinet/store";
+import { type VehicleDocument } from "@/shared/cabinet/store";
 
-const { Paragraph, Text } = Typography;
+const isProduction = import.meta.env.PROD;
 
 type ApplicationStatus = "accepted" | "denied" | "in_process";
 
@@ -78,10 +67,6 @@ function firstNonEmpty(values: unknown[], fallback = ""): string {
   return fallback;
 }
 
-function sameText(left: string, right: string): boolean {
-  return left.trim().toLowerCase() === right.trim().toLowerCase();
-}
-
 function toTeamId(teamName: string, fallback: string): string {
   const slug = teamName
     .toLowerCase()
@@ -93,18 +78,6 @@ function toTeamId(teamName: string, fallback: string): string {
 function normalizeStatus(value: unknown): ApplicationStatus {
   if (value === "accepted" || value === "denied" || value === "in_process") return value;
   return "in_process";
-}
-
-function mapUserToMember(user: PublicUserRecord): ApplicantMember {
-  return {
-    id: user.id,
-    fullName: user.profile.name || user.username,
-    role: user.role,
-    school: user.profile.school,
-    grade: user.profile.grade,
-    aboutMe: user.profile.aboutMe,
-    profilePicture: user.profile.profilePicture,
-  };
 }
 
 function normalizeMembers(rawMembers: unknown, teamId: string): ApplicantMember[] {
@@ -151,12 +124,12 @@ function normalizeApplicant(value: unknown, index: number): Applicant | null {
 
   let members = normalizeMembers(value.members, teamId);
   const memberCountFromApi = Number(
-    isRecord(value.members) ? NaN : (value.membersCount ?? value.members)
+    isRecord(value.members) ? NaN : (value.memberCount ?? value.membersCount ?? value.members)
   );
   if (members.length === 0 && Number.isFinite(memberCountFromApi) && memberCountFromApi > 0) {
     members = Array.from({ length: memberCountFromApi }).map((_, idx) => ({
       id: `${teamId}-member-${idx + 1}`,
-      fullName: `Member ${idx + 1}`,
+      fullName: `Member ${idx + 1}`,  
     }));
   }
 
@@ -204,91 +177,6 @@ function normalizeApplicant(value: unknown, index: number): Applicant | null {
   };
 }
 
-function buildFallbackApplicants(teams: TeamRecord[]): Applicant[] {
-  const statuses: ApplicationStatus[] = ["in_process", "accepted", "denied"];
-
-  return teams.map((team, index) => {
-    const teamUsers = getUsersByTeam(team.id);
-    const mappedMembers = teamUsers.map(mapUserToMember);
-    const supervisor =
-      teamUsers.find((item) => item.role === "supervisor")?.profile.name ||
-      teamUsers.find((item) => item.role === "team_leader")?.profile.name ||
-      "-";
-
-    return {
-      id: `fallback-${index + 1}`,
-      teamId: team.id,
-      teamName: team.name,
-      school: firstNonEmpty(teamUsers.map((item) => item.profile.school), "-"),
-      members: mappedMembers,
-      supervisor,
-      appliedAt: new Date(Date.now() - index * 86_400_000).toISOString(),
-      status: statuses[index % statuses.length],
-      teamDescription: team.description,
-      teamProfilePicture: team.profilePicture,
-      vehicleDescription: team.vehicleDescription,
-      vehiclePictures: team.vehiclePictures,
-      teamDocuments: team.vehicleDocuments,
-    };
-  });
-}
-
-function enrichApplicantWithCabinet(applicant: Applicant, teams: TeamRecord[]): Applicant {
-  const teamById = teams.find((team) => team.id === applicant.teamId);
-  const teamByName = teams.find((team) => sameText(team.name, applicant.teamName));
-  const team = teamById || teamByName;
-  if (!team) return applicant;
-
-  const teamUsers = getUsersByTeam(team.id);
-
-  const mappedMembers =
-    applicant.members.length > 0
-      ? applicant.members.map((member) => {
-          const matchedUser =
-            teamUsers.find((user) => user.id === member.id) ||
-            teamUsers.find((user) => sameText(user.profile.name || user.username, member.fullName));
-
-          if (!matchedUser) return member;
-
-          return {
-            id: matchedUser.id,
-            fullName: member.fullName || matchedUser.profile.name || matchedUser.username,
-            role: member.role || matchedUser.role,
-            school: member.school || matchedUser.profile.school,
-            grade: member.grade || matchedUser.profile.grade,
-            aboutMe: member.aboutMe || matchedUser.profile.aboutMe,
-            profilePicture: member.profilePicture || matchedUser.profile.profilePicture,
-          };
-        })
-      : teamUsers.map(mapUserToMember);
-
-  const supervisor =
-    applicant.supervisor !== "-"
-      ? applicant.supervisor
-      : teamUsers.find((user) => user.role === "supervisor")?.profile.name ||
-        teamUsers.find((user) => user.role === "team_leader")?.profile.name ||
-        "-";
-
-  return {
-    ...applicant,
-    teamId: team.id,
-    teamName: applicant.teamName || team.name,
-    school:
-      applicant.school !== "-"
-        ? applicant.school
-        : firstNonEmpty(teamUsers.map((user) => user.profile.school), "-"),
-    members: mappedMembers,
-    supervisor,
-    teamDescription: applicant.teamDescription || team.description,
-    teamProfilePicture: applicant.teamProfilePicture || team.profilePicture,
-    vehicleDescription: applicant.vehicleDescription || team.vehicleDescription,
-    vehiclePictures:
-      applicant.vehiclePictures.length > 0 ? applicant.vehiclePictures : team.vehiclePictures,
-    teamDocuments:
-      applicant.teamDocuments.length > 0 ? applicant.teamDocuments : team.vehicleDocuments,
-  };
-}
-
 const ApplicationPage: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -297,12 +185,8 @@ const ApplicationPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [formModalOpen, setFormModalOpen] = useState(false);
-  const [selectedMember, setSelectedMember] = useState<{
-    team: Applicant;
-    member: ApplicantMember;
-  } | null>(null);
 
-  const OPEN_DATE = new Date("2026-03-01T00:00:00");
+  const OPEN_DATE = new Date("2026-04-01T00:00:00");
   const CLOSE_DATE = new Date("2026-05-15T23:59:59");
 
   const isApplicationOpen = () => {
@@ -318,31 +202,8 @@ const ApplicationPage: React.FC = () => {
   const isOpen = isApplicationOpen();
   const notOpenedYet = hasNotOpenedYet();
 
-  const getRoleLabel = (role?: string) => {
-    switch (role) {
-      case "participant":
-        return t("website.apply.form.roleParticipant");
-      case "team_leader":
-        return t("website.apply.form.roleTeamLeader");
-      case "pilot":
-        return t("website.apply.form.rolePilot");
-      case "reserve_pilot":
-        return t("website.apply.form.roleReservePilot");
-      case "supervisor":
-        return "Supervisor";
-      case "admin":
-        return "Referee";
-      case "super_admin":
-        return "Super admin";
-      default:
-        return role || "-";
-    }
-  };
-
   const fetchApplicants = () => {
     setLoading(true);
-    ensureCabinetSeeded();
-    const teams = getAllTeams();
 
     fetch(ENDPOINT_APPLICATIONS)
       .then((res) => {
@@ -360,18 +221,12 @@ const ApplicationPage: React.FC = () => {
 
         const normalized = rawItems
           .map((item, index) => normalizeApplicant(item, index))
-          .filter((item): item is Applicant => item !== null)
-          .map((item) => enrichApplicantWithCabinet(item, teams));
-
-        if (normalized.length === 0) {
-          setApplicants(buildFallbackApplicants(teams));
-          return;
-        }
+          .filter((item): item is Applicant => item !== null);
 
         setApplicants(normalized);
       })
       .catch(() => {
-        setApplicants(buildFallbackApplicants(teams));
+        setApplicants([]);
       })
       .finally(() => {
         setLoading(false);
@@ -409,10 +264,7 @@ const ApplicationPage: React.FC = () => {
       if (!query) return true;
       const inTeam = applicant.teamName.toLowerCase().includes(query);
       const inSchool = applicant.school.toLowerCase().includes(query);
-      const inMembers = applicant.members.some((member) =>
-        member.fullName.toLowerCase().includes(query)
-      );
-      return inTeam || inSchool || inMembers;
+      return inTeam || inSchool;
     });
   }, [applicants, search]);
 
@@ -421,19 +273,22 @@ const ApplicationPage: React.FC = () => {
       title: t("website.apply.colTeam"),
       dataIndex: "teamName",
       key: "teamName",
-      render: (_: string, record: Applicant) => (
-        <Button
-          type="link"
-          className="!px-0 !font-semibold !text-[#0A306D]"
-          onClick={() =>
-            navigate(`/team/${encodeURIComponent(record.teamId)}`, {
-              state: { applicant: record },
-            })
-          }
-        >
-          {record.teamName}
-        </Button>
-      ),
+      render: (_: string, record: Applicant) =>
+        isProduction ? (
+          <span className="font-semibold text-[#0A306D]">{record.teamName}</span>
+        ) : (
+          <Button
+            type="link"
+            className="!px-0 !font-semibold !text-[#0A306D]"
+            onClick={() =>
+              navigate(`/team/${encodeURIComponent(record.teamId)}`, {
+                state: { applicant: record },
+              })
+            }
+          >
+            {record.teamName}
+          </Button>
+        ),
     },
     {
       title: t("website.apply.colSchool"),
@@ -444,30 +299,10 @@ const ApplicationPage: React.FC = () => {
     {
       title: t("website.apply.colMembers"),
       key: "members",
-      width: 280,
+      width: 100,
       render: (_: unknown, record: Applicant) => (
-        <div>
-          <div className="font-medium mb-1">{record.members.length}</div>
-          <Space size={[8, 2]} wrap>
-            {record.members.map((member) => (
-              <Button
-                key={`${record.id}-${member.id}`}
-                type="link"
-                className="!px-0 !h-auto"
-                onClick={() => setSelectedMember({ team: record, member })}
-              >
-                {member.fullName}
-              </Button>
-            ))}
-          </Space>
-        </div>
+        <div className="font-medium">{record.members.length || 4}</div>
       ),
-    },
-    {
-      title: t("website.apply.colSupervisor"),
-      dataIndex: "supervisor",
-      key: "supervisor",
-      responsive: ["lg" as const],
     },
     {
       title: t("website.apply.colDate"),
@@ -628,63 +463,6 @@ const ApplicationPage: React.FC = () => {
           />
         </Modal>
       )}
-
-      <Modal
-        open={selectedMember !== null}
-        onCancel={() => setSelectedMember(null)}
-        footer={null}
-        width={640}
-        title={selectedMember?.member.fullName || "Member"}
-      >
-        {selectedMember && (
-          <Space direction="vertical" className="w-full" size="middle">
-            <div className="flex items-center gap-3">
-              {selectedMember.member.profilePicture ? (
-                <Avatar size={56} src={selectedMember.member.profilePicture} />
-              ) : (
-                <Avatar size={56} icon={<UserOutlined />} />
-              )}
-              <div>
-                <div className="font-semibold text-base">{selectedMember.member.fullName}</div>
-                <div className="text-sm text-gray-500">{getRoleLabel(selectedMember.member.role)}</div>
-              </div>
-            </div>
-
-            <div>
-              <Text strong>Team: </Text>
-              <Button
-                type="link"
-                className="!px-1"
-                onClick={() => {
-                  navigate(`/team/${encodeURIComponent(selectedMember.team.teamId)}`, {
-                    state: { applicant: selectedMember.team },
-                  });
-                  setSelectedMember(null);
-                }}
-              >
-                {selectedMember.team.teamName}
-              </Button>
-            </div>
-            <div>
-              <Text strong>School: </Text>
-              <Text>{selectedMember.member.school || "-"}</Text>
-            </div>
-            <div>
-              <Text strong>Grade: </Text>
-              <Text>{selectedMember.member.grade || "-"}</Text>
-            </div>
-            <div>
-              <Text strong>About me: </Text>
-              <Paragraph className="!mb-0">{selectedMember.member.aboutMe || "-"}</Paragraph>
-            </div>
-            <Alert
-              type="info"
-              showIcon
-              message="Contact details and date of birth are hidden in public profile view."
-            />
-          </Space>
-        )}
-      </Modal>
     </div>
   );
 };
