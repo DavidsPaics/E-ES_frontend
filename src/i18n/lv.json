@@ -244,6 +244,7 @@
       "passwordRequired": "Parole ir obligāta.",
       "signUpSubtitle": "Izveidojiet dalībnieka kontu piekļuvei profilam.",
       "accountCreated": "Konts izveidots.",
+      "accountPendingVerification": "Jūsu pieteikums gaida verifikāciju. Lūdzu gaidiet, līdz komandas līderis apstiprinās jūsu pieteikumu.",
       "signUpFailed": "Reģistrācija neizdevās.",
       "usernameTaken": "Šis lietotājvārds jau ir aizņemts.",
       "teamNotFound": "Izvēlētā komanda nav atrasta.",
@@ -268,7 +269,10 @@
       "inviteInvalid": "Ielūguma kods nav derīgs.",
       "inviteUsed": "Ielūguma kods jau ir izmantots.",
       "inviteTeamMismatch": "Ielūguma kods neatbilst izvēlētajai komandai.",
-      "inviteLinkDetected": "Atrasta ielūguma saite. Komanda tiks piešķirta pēc reģistrācijas."
+      "inviteLinkDetected": "Atrasta ielūguma saite. Komanda tiks piešķirta pēc reģistrācijas.",
+      "teamLeaderVerificationTitle": "Komandas līdera verifikācija",
+      "teamLeaderVerificationDescription": "Pirms formas iesniegšanas pārbaudiet, vai jūsu vārds, uzvārds, dzimšanas datums, e-pasts un tālrunis sakrīt ar komandas pieteikumā norādīto informāciju.",
+      "teamLeaderVerificationTeam": "Komandas pieteikums"
     },
     "landing": {
       "heroTitle": "Energo Efektivitātes Sacensības (E-ES)",
@@ -475,6 +479,156 @@
           "duplicateReservePilot": "Rezerves pilots var būt tikai viens komandā",
           "duplicateTeamLeader": "Komandas līderis var būt tikai viens komandā"
         }
+      }
+    },
+    "cabinet": {
+      "title": "Profila kabinets",
+      "roles": {
+        "participant": "Dalībnieks",
+        "member": "Dalībnieks",
+        "team_leader": "Komandas līderis",
+        "teamLeader": "Komandas līderis",
+        "team leader": "Komandas līderis",
+        "pilot": "Pilots",
+        "reserve_pilot": "Rezerves pilots",
+        "reservePilot": "Rezerves pilots",
+        "supervisor": "Uzraugs",
+        "admin": "Administrators",
+        "super_admin": "Superadministrators",
+        "superAdmin": "Superadministrators"
+      },
+      "cards": {
+        "myProfile": "Mans profils",
+        "accountActions": "Konta darbības",
+        "roleTeamModeration": "Loma: Komandas moderācija",
+        "superAdminUserModeration": "Superadministrators: Lietotāju moderācija",
+        "superAdminTeamModeration": "Superadministrators: Komandu moderācija"
+      },
+      "modals": {
+        "editUser": "Rediģēt lietotāju",
+        "teamDetails": "Komandas informācija",
+        "editTeam": "Rediģēt komandu"
+      },
+      "fields": {
+        "username": "Lietotājvārds",
+        "name": "Vārds, uzvārds",
+        "dateOfBirth": "Dzimšanas datums",
+        "school": "Skola",
+        "grade": "Klase",
+        "phone": "Tālrunis",
+        "email": "E-pasts",
+        "profilePicture": "Profila attēls",
+        "role": "Loma",
+        "team": "Komanda",
+        "status": "Statuss",
+        "ageGroup": "Vecuma grupa",
+        "institution": "Izglītības iestāde",
+        "cityOrRegion": "Pilsēta/novads",
+        "applied": "Pieteikts",
+        "responsiblePerson": "Atbildīgā persona",
+        "responsibleContact": "Atbildīgās personas kontakti",
+        "leaderVerificationLink": "Komandas līdera verifikācijas saite",
+        "howHeardAbout": "Kā uzzināja",
+        "comments": "Komentāri",
+        "vehicleDescription": "Transportlīdzekļa apraksts",
+        "vehicleDocuments": "Transportlīdzekļa dokumenti",
+        "vehiclePictures": "Transportlīdzekļa attēli",
+        "teamName": "Komandas nosaukums",
+        "teamDescription": "Komandas apraksts",
+        "teamProfilePicture": "Komandas profila attēls"
+      },
+      "columns": {
+        "user": "Lietotājs",
+        "dateOfBirth": "Dzimšanas datums",
+        "role": "Loma",
+        "team": "Komanda",
+        "actions": "Darbības",
+        "action": "Darbība",
+        "status": "Statuss",
+        "ageGroup": "Vecuma grupa",
+        "vehicleDocs": "Dokumenti",
+        "name": "Vārds",
+        "institution": "Izglītības iestāde",
+        "contact": "Kontakti"
+      },
+      "sections": {
+        "members": "Dalībnieki",
+        "teamMembers": "Komandas dalībnieki"
+      },
+      "statuses": {
+        "pending": "Gaida apstiprinājumu",
+        "accepted": "Apstiprināts"
+      },
+      "labels": {
+        "role": "Loma",
+        "membersCount": "{{count}} dalībnieks",
+        "membersCount_plural": "{{count}} dalībnieki"
+      },
+      "empty": {
+        "noTeamAssigned": "Komanda nav piešķirta.",
+        "noTeam": "Nav komandas",
+        "noProfilePicture": "Profila attēls nav augšupielādēts.",
+        "noTeamProfilePicture": "Komandas profila attēls nav augšupielādēts."
+      },
+      "actions": {
+        "goToLogin": "Doties uz pieslēgšanos",
+        "edit": "Rediģēt",
+        "view": "Skatīt",
+        "save": "Saglabāt",
+        "saveProfile": "Saglabāt profilu",
+        "exitTeam": "Iziet no komandas",
+        "deleteAccount": "Dzēst kontu",
+        "removePicture": "Noņemt attēlu",
+        "copy": "Kopēt",
+        "close": "Aizvērt",
+        "accept": "Apstiprināt",
+        "remove": "Noņemt",
+        "delete": "Dzēst",
+        "kick": "Izslēgt"
+      },
+      "alt": {
+        "profile": "Profils",
+        "teamProfile": "Komandas profils",
+        "vehicle": "Transportlīdzeklis"
+      },
+      "validation": {
+        "usernameRequired": "Lietotājvārds ir obligāts.",
+        "nameRequired": "Vārds ir obligāts.",
+        "roleRequired": "Loma ir obligāta.",
+        "dateOfBirthRequired": "Dzimšanas datums ir obligāts.",
+        "invalidDate": "Nepareizs datuma formāts (izmantojiet DD.MM.GGGG).",
+        "emailInvalid": "Lūdzu ievadiet derīgu e-pastu.",
+        "teamNameRequired": "Komandas nosaukums ir obligāts."
+      },
+      "confirm": {
+        "leaveTeam": "Vai iziet no pašreizējās komandas?",
+        "deleteAccount": "Vai neatgriezeniski dzēst jūsu kontu?",
+        "deleteTeam": "Vai dzēst komandu \"{{name}}\"?",
+        "kickMember": "Vai izslēgt šo dalībnieku no komandas?"
+      },
+      "messages": {
+        "noSession": "Nav aktīvas lietotāja sesijas. Lūdzu pieslēdzieties vēlreiz.",
+        "usersLoadFallback": "Neizdevās ielādēt lietotājus no servera. Tiek rādīti lokālie lietotāji.",
+        "teamsLoadFallback": "Neizdevās ielādēt komandas no servera. Tiek rādītas lokālās komandas.",
+        "pendingMembersLoadFailed": "Neizdevās ielādēt gaidošos komandas dalībniekus.",
+        "profileUpdated": "Profils atjaunināts.",
+        "profileSaveFailed": "Neizdevās saglabāt profilu.",
+        "leftTeam": "Jūs izgājāt no komandas.",
+        "leaveTeamFailed": "Neizdevās iziet no komandas.",
+        "leaderLinkCopied": "Komandas līdera verifikācijas saite nokopēta.",
+        "leaderLinkCopyFailed": "Neizdevās nokopēt komandas līdera verifikācijas saiti.",
+        "pendingMemberAccepted": "Gaidošais komandas dalībnieks apstiprināts.",
+        "pendingMemberAcceptFailed": "Neizdevās apstiprināt gaidošo komandas dalībnieku.",
+        "imageReadFailed": "Neizdevās nolasīt attēlu failus.",
+        "documentReadFailed": "Neizdevās nolasīt dokumentu failus.",
+        "profilePictureReadFailed": "Neizdevās nolasīt profila attēlu.",
+        "userNotFound": "Lietotājs nav atrasts",
+        "userUpdated": "Lietotājs atjaunināts.",
+        "userUpdateFailed": "Neizdevās atjaunināt lietotāju.",
+        "teamUpdated": "Komanda atjaunināta.",
+        "teamUpdateFailed": "Neizdevās atjaunināt komandu.",
+        "teamDeleted": "Komanda dzēsta.",
+        "memberRemoved": "Dalībnieks noņemts."
       }
     },
     "footer": {

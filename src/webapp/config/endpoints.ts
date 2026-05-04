@@ -50,7 +50,7 @@ export const ENDPOINT_ADMIN_DELETE = `${BASE_URL}/api/delete`;
 
 // Applications endpoint (public — used by website)
 export const ENDPOINT_TEAMS = `${BASE_URL}/api/teams`;
-export const ENDPOINT_TEAM_APPLICATION = `${BASE_URL}/api/team-application`;
+export const ENDPOINT_TEAM_APPLICATION = `${BASE_URL}/api/team-applications`;
 export const ENDPOINT_TEAM_APPLICATION_UPDATE = `${BASE_URL}/api/team`;
 export const ENDPOINT_APPLICATIONS = ENDPOINT_TEAMS;
 

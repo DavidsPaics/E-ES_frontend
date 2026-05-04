@@ -16,15 +16,23 @@ import {
   message,
 } from "antd";
 import {
+  CopyOutlined,
   DeleteOutlined,
   SaveOutlined,
   TeamOutlined,
   UserOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/webapp/authentification/AuthContext";
 import { storeAuthUser } from "@/webapp/authentification/credentials";
-import { ENDPOINT_ACCOUNT, ENDPOINT_ACCOUNTS, ENDPOINT_TEAMS } from "@/webapp/config/endpoints";
+import {
+  ENDPOINT_ACCOUNT,
+  ENDPOINT_ACCOUNT_APPLICATIONS,
+  ENDPOINT_ACCOUNTS,
+  ENDPOINT_TEAMS,
+  ENDPOINT_VERIFY_ACCOUNT_APPLICATION,
+} from "@/webapp/config/endpoints";
 import { apiFetch } from "@/webapp/utils/api";
 import {
   deleteTeam,
@@ -48,6 +56,7 @@ import customParseFormat from "dayjs/plugin/customParseFormat";
 dayjs.extend(customParseFormat);
 
 const { Text, Title } = Typography;
+const LEADER_VERIFICATION_SIGNUP_ORIGIN = "https://e-es.lv";
 
 interface ProfileFormValues {
   username: string;
@@ -81,6 +90,17 @@ interface TeamModerationMember {
   phone?: string;
   email?: string;
   classOrYear?: string;
+}
+
+interface PendingTeamMemberApplication extends TeamModerationMember {
+  teamName: string;
+  username: string;
+}
+
+interface TeamModerationMemberRow extends TeamModerationMember {
+  status: "registered" | "pending";
+  pendingApplicationKey?: string;
+  username?: string;
 }
 
 interface TeamModerationRecord extends TeamRecord {
@@ -231,6 +251,30 @@ function normalizeTeamMember(value: unknown, index: number, teamId: string): Tea
   };
 }
 
+function normalizePendingTeamMemberApplication(
+  value: unknown,
+  index: number
+): PendingTeamMemberApplication | null {
+  if (!isRecord(value)) return null;
+
+  const key = firstString([value.key, value.id, value.ID], `pending-member-${index + 1}`);
+  const fullName = firstString([value.fullName, value.vardsUzvards, value.name], "");
+  const teamName = firstString([value.komandasNosaukums, value.teamName, value.team, value.name], "");
+  if (!key || !fullName || !teamName) return null;
+
+  return {
+    key,
+    fullName,
+    teamName,
+    username: firstString([value.lietotajvards, value.username], ""),
+    role: firstString([value.role, value.loma], "") || undefined,
+    dateOfBirth: firstString([value.dateOfBirth, value.dzimsanasDatums], "") || undefined,
+    educationalInstitution: firstString([value.educationalInstitution, value.school], "") || undefined,
+    phone: firstString([value.telefonanumurs, value.phoneNumber, value.phone], "") || undefined,
+    email: firstString([value.epasts, value.email], "") || undefined,
+  };
+}
+
 function normalizeVehicleDocuments(value: unknown, teamId: string): VehicleDocument[] {
   if (!Array.isArray(value)) return [];
 
@@ -336,6 +380,89 @@ function getTeamResponseItems(payload: unknown): unknown[] {
   }
 
   return [];
+}
+
+function getPendingTeamMemberResponseItems(payload: unknown): unknown[] {
+  if (Array.isArray(payload)) return payload;
+  if (!isRecord(payload)) return [];
+
+  const nestedPayloads = [
+    payload.accountApplications,
+    payload.applications,
+    payload.teamApplications,
+    payload.pendingMembers,
+    payload.data,
+  ];
+  for (const nested of nestedPayloads) {
+    if (Array.isArray(nested)) return nested;
+    if (isRecord(nested)) return [nested];
+  }
+
+  if (
+    typeof payload.fullName === "string" ||
+    typeof payload.lietotajvards === "string" ||
+    typeof payload.komandasNosaukums === "string"
+  ) {
+    return [payload];
+  }
+
+  return [];
+}
+
+function normalizeTeamName(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function normalizeRoleTranslationKey(role?: string): string {
+  const normalized = (role || "")
+    .trim()
+    .replace(/([a-z])([A-Z])/g, "$1_$2")
+    .replace(/[\s-]+/g, "_")
+    .toLowerCase();
+
+  switch (normalized) {
+    case "member":
+      return "participant";
+    case "teamleader":
+    case "team_leader":
+    case "leader":
+      return "team_leader";
+    case "reservepilot":
+    case "reserve_pilot":
+      return "reserve_pilot";
+    case "superadmin":
+    case "super_admin":
+      return "super_admin";
+    default:
+      return normalized;
+  }
+}
+
+function getLeaderVerificationLink(teamId: string): string {
+  return `${LEADER_VERIFICATION_SIGNUP_ORIGIN}/signup?uniqueID=${encodeURIComponent(teamId)}`;
+}
+
+async function copyTextToClipboard(text: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textArea = document.createElement("textarea");
+  textArea.value = text;
+  textArea.style.position = "fixed";
+  textArea.style.left = "-9999px";
+  textArea.style.top = "0";
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+
+  try {
+    const copied = document.execCommand("copy");
+    if (!copied) throw new Error("Copy command failed");
+  } finally {
+    document.body.removeChild(textArea);
+  }
 }
 
 function teamRoleLabel(role?: string): string {
@@ -495,6 +622,7 @@ async function readFilesAsDataUrls(files: FileList | null): Promise<string[]> {
 
 const CabinetPage: React.FC = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { currentUser, refreshCurrentUser, logout } = useAuth();
   const [profileForm] = Form.useForm<ProfileFormValues>();
   const [adminUserForm] = Form.useForm<AdminUserFormValues>();
@@ -505,8 +633,11 @@ const CabinetPage: React.FC = () => {
 
   const [allUsers, setAllUsers] = useState<PublicUserRecord[]>([]);
   const [allTeams, setAllTeams] = useState<TeamModerationRecord[]>([]);
+  const [pendingTeamMembers, setPendingTeamMembers] = useState<PendingTeamMemberApplication[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [teamsLoading, setTeamsLoading] = useState(false);
+  const [pendingTeamMembersLoading, setPendingTeamMembersLoading] = useState(false);
+  const [acceptingPendingMemberKey, setAcceptingPendingMemberKey] = useState<string | null>(null);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
   const [viewingTeam, setViewingTeam] = useState<TeamModerationRecord | null>(null);
@@ -521,6 +652,18 @@ const CabinetPage: React.FC = () => {
     currentUser?.role === "reserve_pilot" ||
     currentUser?.role === "supervisor";
   const isSuperAdmin = currentUser?.role === "super_admin";
+  const canAcceptPendingMembers = isSuperAdmin || currentUser?.role === "team_leader";
+  const c = (key: string, options?: Record<string, unknown>) =>
+    t(`website.cabinet.${key}`, options);
+  const formatRoleLabel = (role: UserRole) => {
+    const key = normalizeRoleTranslationKey(role);
+    return c(`roles.${key}`, { defaultValue: roleLabel(role) });
+  };
+  const formatTeamRoleLabel = (role?: string) => {
+    if (!role) return "-";
+    const key = normalizeRoleTranslationKey(role);
+    return c(`roles.${key}`, { defaultValue: teamRoleLabel(role) });
+  };
 
   const allTeamOptions = useMemo(
     () =>
@@ -530,6 +673,33 @@ const CabinetPage: React.FC = () => {
       })),
     [allTeams]
   );
+
+  const viewingTeamMemberRows = useMemo<TeamModerationMemberRow[]>(() => {
+    if (!viewingTeam) return [];
+
+    const teamName = normalizeTeamName(viewingTeam.name);
+    const registeredRows = viewingTeam.members.map<TeamModerationMemberRow>((member) => ({
+      ...member,
+      status: "registered",
+    }));
+    const pendingRows = pendingTeamMembers
+      .filter((member) => normalizeTeamName(member.teamName) === teamName)
+      .map<TeamModerationMemberRow>((member) => ({
+        key: member.key,
+        fullName: member.fullName,
+        role: member.role,
+        dateOfBirth: member.dateOfBirth,
+        educationalInstitution: member.educationalInstitution,
+        phone: member.phone,
+        email: member.email,
+        classOrYear: member.classOrYear,
+        username: member.username,
+        status: "pending",
+        pendingApplicationKey: member.key,
+      }));
+
+    return [...registeredRows, ...pendingRows];
+  }, [pendingTeamMembers, viewingTeam]);
 
   const fetchModerationUsers = async () => {
     setUsersLoading(true);
@@ -553,7 +723,7 @@ const CabinetPage: React.FC = () => {
       setAllUsers(users);
     } catch (error) {
       setAllUsers(getAllUsers());
-      message.warning("Could not load users from server. Showing local users.");
+      message.warning(c("messages.usersLoadFallback"));
     } finally {
       setUsersLoading(false);
     }
@@ -575,9 +745,30 @@ const CabinetPage: React.FC = () => {
       setAllTeams(teams);
     } catch (error) {
       setAllTeams(getAllTeams().map(localTeamToModerationRecord));
-      message.warning("Could not load teams from server. Showing local teams.");
+      message.warning(c("messages.teamsLoadFallback"));
     } finally {
       setTeamsLoading(false);
+    }
+  };
+
+  const fetchPendingTeamMemberApplications = async () => {
+    setPendingTeamMembersLoading(true);
+    try {
+      const response = await apiFetch(ENDPOINT_ACCOUNT_APPLICATIONS);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const payload: unknown = await response.json();
+      const items = getPendingTeamMemberResponseItems(payload);
+      const members = items
+        .map((item, index) => normalizePendingTeamMemberApplication(item, index))
+        .filter((item): item is PendingTeamMemberApplication => item !== null);
+
+      setPendingTeamMembers(members);
+    } catch (error) {
+      setPendingTeamMembers([]);
+      message.warning(c("messages.pendingMembersLoadFailed"));
+    } finally {
+      setPendingTeamMembersLoading(false);
     }
   };
 
@@ -598,12 +789,15 @@ const CabinetPage: React.FC = () => {
     if (isSuperAdmin) {
       void fetchModerationUsers();
       void fetchModerationTeams();
+      void fetchPendingTeamMemberApplications();
     } else if (canManageOwnTeam) {
       setAllUsers([]);
       void fetchModerationTeams();
+      void fetchPendingTeamMemberApplications();
     } else {
       setAllUsers([]);
       setAllTeams([]);
+      setPendingTeamMembers([]);
     }
   };
 
@@ -627,34 +821,67 @@ const CabinetPage: React.FC = () => {
 
       storeAuthUser(updatedUser);
       refreshCurrentUser();
-      message.success("Profile updated.");
+      message.success(c("messages.profileUpdated"));
     } catch (error) {
-      const text = error instanceof Error ? error.message : "Failed to save profile.";
+      const text = error instanceof Error ? error.message : c("messages.profileSaveFailed");
       message.error(text);
     }
   };
 
   const handleLeaveTeam = () => {
     if (!currentUser?.teamId) return;
-    if (!window.confirm("Leave current team?")) return;
+    if (!window.confirm(c("confirm.leaveTeam"))) return;
 
     try {
       removeUserFromTeam(currentUser.id);
       refreshCurrentUser();
-      message.success("You left the team.");
+      message.success(c("messages.leftTeam"));
     } catch (error) {
-      const text = error instanceof Error ? error.message : "Failed to leave team.";
+      const text = error instanceof Error ? error.message : c("messages.leaveTeamFailed");
       message.error(text);
     }
   };
 
   const handleDeleteAccount = () => {
     if (!currentUser) return;
-    if (!window.confirm("Delete your account permanently?")) return;
+    if (!window.confirm(c("confirm.deleteAccount"))) return;
 
     deleteUser(currentUser.id);
     logout();
     navigate("/signin");
+  };
+
+  const handleCopyLeaderVerificationLink = async (teamId: string) => {
+    const link = getLeaderVerificationLink(teamId);
+    try {
+      await copyTextToClipboard(link);
+      message.success(c("messages.leaderLinkCopied"));
+    } catch {
+      message.error(c("messages.leaderLinkCopyFailed"));
+    }
+  };
+
+  const handleAcceptPendingMember = async (applicationKey: string) => {
+    setAcceptingPendingMemberKey(applicationKey);
+    try {
+      const response = await apiFetch(
+        `${ENDPOINT_VERIFY_ACCOUNT_APPLICATION}?key=${encodeURIComponent(applicationKey)}`,
+        { method: "POST" }
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      setPendingTeamMembers((prev) => prev.filter((member) => member.key !== applicationKey));
+      void fetchPendingTeamMemberApplications();
+      void fetchModerationTeams();
+      if (isSuperAdmin) void fetchModerationUsers();
+      message.success(c("messages.pendingMemberAccepted"));
+    } catch (error) {
+      const text =
+        error instanceof Error ? error.message : c("messages.pendingMemberAcceptFailed");
+      message.error(text);
+    } finally {
+      setAcceptingPendingMemberKey(null);
+    }
   };
 
   const handleAddTeamPictures = async (
@@ -667,7 +894,7 @@ const CabinetPage: React.FC = () => {
         setAdminTeamPictures((prev) => [...prev, ...images]);
       }
     } catch {
-      message.error("Failed to read image files.");
+      message.error(c("messages.imageReadFailed"));
     }
   };
 
@@ -693,7 +920,7 @@ const CabinetPage: React.FC = () => {
         setAdminTeamDocuments((prev) => [...prev, ...docs]);
       }
     } catch {
-      message.error("Failed to read document files.");
+      message.error(c("messages.documentReadFailed"));
     }
   };
 
@@ -718,7 +945,7 @@ const CabinetPage: React.FC = () => {
     try {
       const values = await adminUserForm.validateFields();
       const editingUser = allUsers.find((user) => user.id === editingUserId);
-      if (!editingUser) throw new Error("User not found");
+      if (!editingUser) throw new Error(c("messages.userNotFound"));
 
       await saveAccountProfileToApi(editingUser, values, values.role, values.teamId || undefined);
       const updatedUser = buildUpdatedUser(
@@ -739,11 +966,11 @@ const CabinetPage: React.FC = () => {
       setAllUsers((prev) => prev.map((user) => (user.id === editingUserId ? updatedUser : user)));
       if (currentUser?.id === editingUserId) storeAuthUser(updatedUser);
       setEditingUserId(null);
-      message.success("User updated.");
+      message.success(c("messages.userUpdated"));
       refreshCurrentUser();
       refreshPageData();
     } catch (error) {
-      const text = error instanceof Error ? error.message : "Failed to update user.";
+      const text = error instanceof Error ? error.message : c("messages.userUpdateFailed");
       message.error(text);
     }
   };
@@ -774,39 +1001,39 @@ const CabinetPage: React.FC = () => {
         vehicleDocuments: adminTeamDocuments,
       });
       setEditingTeamId(null);
-      message.success("Team updated.");
+      message.success(c("messages.teamUpdated"));
       refreshCurrentUser();
       refreshPageData();
     } catch (error) {
-      const text = error instanceof Error ? error.message : "Failed to update team.";
+      const text = error instanceof Error ? error.message : c("messages.teamUpdateFailed");
       message.error(text);
     }
   };
 
   const handleDeleteAnyTeam = (teamRecord: TeamRecord) => {
-    if (!window.confirm(`Delete team "${teamRecord.name}"?`)) return;
+    if (!window.confirm(c("confirm.deleteTeam", { name: teamRecord.name }))) return;
     deleteTeam(teamRecord.id);
-    message.success("Team deleted.");
+    message.success(c("messages.teamDeleted"));
     refreshCurrentUser();
     refreshPageData();
   };
 
   const handleKickFromAdminTeam = (teamId: string, memberId: string) => {
-    if (!window.confirm("Kick this member from team?")) return;
+    if (!window.confirm(c("confirm.kickMember"))) return;
     kickTeamMember(teamId, memberId);
     setAdminTeamMembers(getUsersByTeam(teamId));
     refreshCurrentUser();
     refreshPageData();
-    message.success("Member removed.");
+    message.success(c("messages.memberRemoved"));
   };
 
   if (!currentUser) {
     return (
       <section className="py-10 bg-gray-50 min-h-[60vh]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <Alert type="warning" message="No active user session. Please log in again." />
+          <Alert type="warning" message={c("messages.noSession")} />
           <Button className="mt-4" type="primary" onClick={() => navigate("/signin")}>
-            Go to login
+            {c("actions.goToLogin")}
           </Button>
         </div>
       </section>
@@ -815,7 +1042,7 @@ const CabinetPage: React.FC = () => {
 
   const userColumns = [
     {
-      title: "User",
+      title: c("columns.user"),
       key: "user",
       render: (_: unknown, record: PublicUserRecord) => (
         <div>
@@ -825,21 +1052,21 @@ const CabinetPage: React.FC = () => {
       ),
     },
     {
-      title: "Date of birth",
+      title: c("columns.dateOfBirth"),
       key: "dateOfBirth",
       responsive: ["lg" as const],
       render: (_: unknown, record: PublicUserRecord) =>
         record.profile.dateOfBirth ? formatDisplayDate(record.profile.dateOfBirth) : "-",
     },
     {
-      title: "Role",
+      title: c("columns.role"),
       key: "role",
       render: (_: unknown, record: PublicUserRecord) => (
-        <Tag color={roleColor(record.role)}>{roleLabel(record.role)}</Tag>
+        <Tag color={roleColor(record.role)}>{formatRoleLabel(record.role)}</Tag>
       ),
     },
     {
-      title: "Team",
+      title: c("columns.team"),
       key: "team",
       render: (_: unknown, record: PublicUserRecord) => {
         const userTeam = allTeams.find((item) => item.id === record.teamId);
@@ -847,12 +1074,12 @@ const CabinetPage: React.FC = () => {
       },
     },
     {
-      title: "Actions",
+      title: c("columns.actions"),
       key: "actions",
       width: 90,
       render: (_: unknown, record: PublicUserRecord) => (
         <Button size="small" onClick={() => openUserEditor(record)}>
-          Edit
+          {c("actions.edit")}
         </Button>
       ),
     },
@@ -860,41 +1087,41 @@ const CabinetPage: React.FC = () => {
 
   const teamColumns = [
     {
-      title: "Team",
+      title: c("columns.team"),
       key: "name",
       render: (_: unknown, record: TeamModerationRecord) => (
         <div>
           <div className="font-semibold">{record.name}</div>
           <div className="text-xs text-gray-500">
-            {record.members.length || record.memberIds.length} members
+            {c("labels.membersCount", { count: record.members.length || record.memberIds.length })}
           </div>
         </div>
       ),
     },
     {
-      title: "Status",
+      title: c("columns.status"),
       key: "status",
       responsive: ["md" as const],
       render: (_: unknown, record: TeamModerationRecord) => record.status || "-",
     },
     {
-      title: "Age group",
+      title: c("columns.ageGroup"),
       key: "ageGroup",
       responsive: ["md" as const],
       render: (_: unknown, record: TeamModerationRecord) => record.ageGroup || "-",
     },
     {
-      title: "Vehicle docs",
+      title: c("columns.vehicleDocs"),
       key: "docs",
       render: (_: unknown, record: TeamModerationRecord) => record.vehicleDocuments.length,
     },
     {
-      title: "Actions",
+      title: c("columns.actions"),
       key: "actions",
       width: 90,
       render: (_: unknown, record: TeamModerationRecord) => (
         <Button size="small" onClick={() => setViewingTeam(record)}>
-          View
+          {c("actions.view")}
         </Button>
       ),
     },
@@ -904,61 +1131,61 @@ const CabinetPage: React.FC = () => {
     <section className="py-10 bg-gray-50">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-[#0A306D] [&_.ant-card]:!text-[#0A306D] [&_.ant-card-head-title]:!text-[#0A306D] [&_.ant-form-item-label>label]:!text-[#0A306D] flex flex-col gap-4">
         <Title level={2} className="!text-[#0A306D] !mb-0">
-          Profile Cabinet
+          {c("title")}
         </Title>
         <Text className="!text-[#36598B]">
-          Role: <Tag color={roleColor(currentUser.role)}>{roleLabel(currentUser.role)}</Tag>
+          {c("labels.role")}: <Tag color={roleColor(currentUser.role)}>{formatRoleLabel(currentUser.role)}</Tag>
         </Text>
 
-        <Card title={<span><UserOutlined /> My Profile</span>}>
+        <Card title={<span><UserOutlined /> {c("cards.myProfile")}</span>}>
           <Form form={profileForm} layout="vertical">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Form.Item
                 name="username"
-                label="Username"
-                rules={[{ required: true, message: "Username is required." }]}
+                label={c("fields.username")}
+                rules={[{ required: true, message: c("validation.usernameRequired") }]}
               >
                 <Input />
               </Form.Item>
               <Form.Item
                 name="name"
-                label="Name"
-                rules={[{ required: true, message: "Name is required." }]}
+                label={c("fields.name")}
+                rules={[{ required: true, message: c("validation.nameRequired") }]}
               >
                 <Input />
               </Form.Item>
               <Form.Item
                 name="dateOfBirth"
-                label="Date of birth"
+                label={c("fields.dateOfBirth")}
                 normalize={(value: string) => formatDateInput(value)}
                 rules={[
                   {
                     validator: (_, value: string) => {
                       if (!value) return Promise.resolve();
                       if (parseDateString(value)) return Promise.resolve();
-                      return Promise.reject(new Error("Invalid date format (use DD.MM.YYYY)."));
+                      return Promise.reject(new Error(c("validation.invalidDate")));
                     },
                   },
                 ]}
               >
                 <Input placeholder="DD.MM.YYYY" maxLength={10} autoComplete="bday" />
               </Form.Item>
-              <Form.Item name="school" label="School">
+              <Form.Item name="school" label={c("fields.school")}>
                 <Input />
               </Form.Item>
-              <Form.Item name="grade" label="Grade">
+              <Form.Item name="grade" label={c("fields.grade")}>
                 <Input />
               </Form.Item>
-              <Form.Item name="phone" label="Phone">
+              <Form.Item name="phone" label={c("fields.phone")}>
                 <Input />
               </Form.Item>
               <Form.Item
                 name="email"
-                label="E-mail"
+                label={c("fields.email")}
                 rules={[
                   {
                     type: "email",
-                    message: "Please enter a valid e-mail.",
+                    message: c("validation.emailInvalid"),
                   },
                 ]}
               >
@@ -969,13 +1196,13 @@ const CabinetPage: React.FC = () => {
               <Input />
             </Form.Item>
             <div className="mb-4">
-              <div className="font-semibold mb-2">Profile picture</div>
+              <div className="font-semibold mb-2">{c("fields.profilePicture")}</div>
               {watchedProfilePicture ? (
                 <div className="mb-2">
-                  <Image src={watchedProfilePicture} alt="Profile" width={120} className="rounded" />
+                  <Image src={watchedProfilePicture} alt={c("alt.profile")} width={120} className="rounded" />
                 </div>
               ) : (
-                <Text type="secondary">No profile picture uploaded.</Text>
+                <Text type="secondary">{c("empty.noProfilePicture")}</Text>
               )}
               <div className="mt-2 flex items-center gap-3 flex-wrap">
                 <input
@@ -988,7 +1215,7 @@ const CabinetPage: React.FC = () => {
                       const encoded = await readFileAsDataUrl(file);
                       profileForm.setFieldValue("profilePicture", encoded);
                     } catch {
-                      message.error("Failed to read profile picture.");
+                      message.error(c("messages.profilePictureReadFailed"));
                     } finally {
                       event.target.value = "";
                     }
@@ -996,48 +1223,48 @@ const CabinetPage: React.FC = () => {
                 />
                 {watchedProfilePicture && (
                   <Button onClick={() => profileForm.setFieldValue("profilePicture", "")}>
-                    Remove picture
+                    {c("actions.removePicture")}
                   </Button>
                 )}
               </div>
             </div>
             <Space wrap>
               <Button type="primary" icon={<SaveOutlined />} onClick={handleProfileSave}>
-                Save profile
+                {c("actions.saveProfile")}
               </Button>
             </Space>
           </Form>
         </Card>
 
-        <Card title="Account Actions">
+        <Card title={c("cards.accountActions")}>
           <Space wrap>
             {currentUser.teamId && (
               <Button onClick={handleLeaveTeam}>
-                Exit from team
+                {c("actions.exitTeam")}
               </Button>
             )}
             <Button danger icon={<DeleteOutlined />} onClick={handleDeleteAccount}>
-              Delete account
+              {c("actions.deleteAccount")}
             </Button>
           </Space>
         </Card>
 
         {canManageOwnTeam && !isSuperAdmin && (
-          <Card title={<span><TeamOutlined /> Role: Team Moderation</span>}>
+          <Card title={<span><TeamOutlined /> {c("cards.roleTeamModeration")}</span>}>
             <Table<TeamModerationRecord>
               dataSource={allTeams}
               rowKey="id"
               columns={teamColumns}
               loading={teamsLoading}
               pagination={allTeams.length > 10 ? { pageSize: 10 } : false}
-              locale={{ emptyText: "No team assigned." }}
+              locale={{ emptyText: c("empty.noTeamAssigned") }}
             />
           </Card>
         )}
 
         {isSuperAdmin && (
           <>
-            <Card title="Super Admin: User Moderation">
+            <Card title={c("cards.superAdminUserModeration")}>
               <Table<PublicUserRecord>
                 dataSource={allUsers}
                 rowKey="id"
@@ -1047,7 +1274,7 @@ const CabinetPage: React.FC = () => {
               />
             </Card>
 
-            <Card title="Super Admin: Team Moderation">
+            <Card title={c("cards.superAdminTeamModeration")}>
               <Table<TeamModerationRecord>
                 dataSource={allTeams}
                 rowKey="id"
@@ -1062,82 +1289,82 @@ const CabinetPage: React.FC = () => {
 
       <Modal
         open={editingUserId !== null}
-        title="Edit User"
+        title={c("modals.editUser")}
         onCancel={() => setEditingUserId(null)}
         onOk={handleSaveEditedUser}
-        okText="Save"
+        okText={c("actions.save")}
         width={800}
       >
         <Form form={adminUserForm} layout="vertical">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Form.Item
               name="username"
-              label="Username"
-              rules={[{ required: true, message: "Username is required." }]}
+              label={c("fields.username")}
+              rules={[{ required: true, message: c("validation.usernameRequired") }]}
             >
               <Input />
             </Form.Item>
             <Form.Item
               name="role"
-              label="Role"
-              rules={[{ required: true, message: "Role is required." }]}
+              label={c("fields.role")}
+              rules={[{ required: true, message: c("validation.roleRequired") }]}
             >
               <Select
                 options={[
-                  { value: "participant", label: roleLabel("participant") },
-                  { value: "team_leader", label: roleLabel("team_leader") },
-                  { value: "pilot", label: roleLabel("pilot") },
-                  { value: "reserve_pilot", label: roleLabel("reserve_pilot") },
-                  { value: "supervisor", label: roleLabel("supervisor") },
-                  { value: "admin", label: roleLabel("admin") },
-                  { value: "super_admin", label: roleLabel("super_admin") },
+                  { value: "participant", label: formatRoleLabel("participant") },
+                  { value: "team_leader", label: formatRoleLabel("team_leader") },
+                  { value: "pilot", label: formatRoleLabel("pilot") },
+                  { value: "reserve_pilot", label: formatRoleLabel("reserve_pilot") },
+                  { value: "supervisor", label: formatRoleLabel("supervisor") },
+                  { value: "admin", label: formatRoleLabel("admin") },
+                  { value: "super_admin", label: formatRoleLabel("super_admin") },
                 ]}
               />
             </Form.Item>
-            <Form.Item name="teamId" label="Team">
+            <Form.Item name="teamId" label={c("fields.team")}>
               <Select
                 allowClear
-                placeholder="No team"
+                placeholder={c("empty.noTeam")}
                 options={allTeamOptions}
               />
             </Form.Item>
             <Form.Item
               name="name"
-              label="Name"
-              rules={[{ required: true, message: "Name is required." }]}
+              label={c("fields.name")}
+              rules={[{ required: true, message: c("validation.nameRequired") }]}
             >
               <Input />
             </Form.Item>
             <Form.Item
               name="dateOfBirth"
-              label="Date of birth"
+              label={c("fields.dateOfBirth")}
               normalize={(value: string) => formatDateInput(value)}
               rules={[
-                { required: true, message: "Date of birth is required." },
+                { required: true, message: c("validation.dateOfBirthRequired") },
                 {
                   validator: (_, value: string) => {
                     if (!value) return Promise.resolve();
                     if (parseDateString(value)) return Promise.resolve();
-                    return Promise.reject(new Error("Invalid date format (use DD.MM.YYYY)."));
+                    return Promise.reject(new Error(c("validation.invalidDate")));
                   },
                 },
               ]}
             >
               <Input placeholder="DD.MM.YYYY" maxLength={10} autoComplete="bday" />
             </Form.Item>
-            <Form.Item name="school" label="School">
+            <Form.Item name="school" label={c("fields.school")}>
               <Input />
             </Form.Item>
-            <Form.Item name="grade" label="Grade">
+            <Form.Item name="grade" label={c("fields.grade")}>
               <Input />
             </Form.Item>
-            <Form.Item name="phone" label="Phone">
+            <Form.Item name="phone" label={c("fields.phone")}>
               <Input />
             </Form.Item>
             <Form.Item
               name="email"
-              label="E-mail"
-              rules={[{ type: "email", message: "Please enter a valid e-mail." }]}
+              label={c("fields.email")}
+              rules={[{ type: "email", message: c("validation.emailInvalid") }]}
             >
               <Input />
             </Form.Item>
@@ -1146,18 +1373,18 @@ const CabinetPage: React.FC = () => {
             <Input />
           </Form.Item>
           <div className="mb-4">
-            <div className="font-semibold mb-2">Profile picture</div>
+            <div className="font-semibold mb-2">{c("fields.profilePicture")}</div>
             {watchedAdminUserProfilePicture ? (
               <div className="mb-2">
                 <Image
                   src={watchedAdminUserProfilePicture}
-                  alt="Profile"
+                  alt={c("alt.profile")}
                   width={120}
                   className="rounded"
                 />
               </div>
             ) : (
-              <Text type="secondary">No profile picture uploaded.</Text>
+              <Text type="secondary">{c("empty.noProfilePicture")}</Text>
             )}
             <div className="mt-2 flex items-center gap-3 flex-wrap">
               <input
@@ -1170,7 +1397,7 @@ const CabinetPage: React.FC = () => {
                     const encoded = await readFileAsDataUrl(file);
                     adminUserForm.setFieldValue("profilePicture", encoded);
                   } catch {
-                    message.error("Failed to read profile picture.");
+                    message.error(c("messages.profilePictureReadFailed"));
                   } finally {
                     event.target.value = "";
                   }
@@ -1178,7 +1405,7 @@ const CabinetPage: React.FC = () => {
               />
               {watchedAdminUserProfilePicture && (
                 <Button onClick={() => adminUserForm.setFieldValue("profilePicture", "")}>
-                  Remove picture
+                  {c("actions.removePicture")}
                 </Button>
               )}
             </div>
@@ -1188,11 +1415,11 @@ const CabinetPage: React.FC = () => {
 
       <Modal
         open={viewingTeam !== null}
-        title="Team details"
+        title={c("modals.teamDetails")}
         onCancel={() => setViewingTeam(null)}
         footer={[
           <Button key="close" onClick={() => setViewingTeam(null)}>
-            Close
+            {c("actions.close")}
           </Button>,
         ]}
         width={900}
@@ -1200,70 +1427,120 @@ const CabinetPage: React.FC = () => {
         {viewingTeam && (
           <div className="space-y-4">
             <Descriptions bordered size="small" column={1}>
-              <Descriptions.Item label="Team">{viewingTeam.name}</Descriptions.Item>
-              <Descriptions.Item label="Status">{viewingTeam.status || "-"}</Descriptions.Item>
-              <Descriptions.Item label="Age group">{viewingTeam.ageGroup || "-"}</Descriptions.Item>
-              <Descriptions.Item label="Institution">{viewingTeam.institution || "-"}</Descriptions.Item>
-              <Descriptions.Item label="City/region">{viewingTeam.cityOrRegion || "-"}</Descriptions.Item>
-              <Descriptions.Item label="Applied">
+              <Descriptions.Item label={c("fields.team")}>{viewingTeam.name}</Descriptions.Item>
+              <Descriptions.Item label={c("fields.status")}>{viewingTeam.status || "-"}</Descriptions.Item>
+              <Descriptions.Item label={c("fields.ageGroup")}>{viewingTeam.ageGroup || "-"}</Descriptions.Item>
+              <Descriptions.Item label={c("fields.institution")}>{viewingTeam.institution || "-"}</Descriptions.Item>
+              <Descriptions.Item label={c("fields.cityOrRegion")}>{viewingTeam.cityOrRegion || "-"}</Descriptions.Item>
+              <Descriptions.Item label={c("fields.applied")}>
                 {viewingTeam.appliedAt ? formatDisplayDate(viewingTeam.appliedAt) : "-"}
               </Descriptions.Item>
-              <Descriptions.Item label="Responsible person">
+              <Descriptions.Item label={c("fields.responsiblePerson")}>
                 {viewingTeam.responsiblePerson?.fullName || "-"}
               </Descriptions.Item>
-              <Descriptions.Item label="Responsible contact">
+              <Descriptions.Item label={c("fields.responsibleContact")}>
                 {[viewingTeam.responsiblePerson?.email, viewingTeam.responsiblePerson?.phone]
                   .filter(Boolean)
                   .join(" / ") || "-"}
               </Descriptions.Item>
-              <Descriptions.Item label="How heard about">
+              {isSuperAdmin && (
+                <Descriptions.Item label={c("fields.leaderVerificationLink")}>
+                  <Space.Compact className="w-full">
+                    <Input readOnly value={getLeaderVerificationLink(viewingTeam.id)} />
+                    <Button
+                      icon={<CopyOutlined />}
+                      onClick={() => handleCopyLeaderVerificationLink(viewingTeam.id)}
+                    >
+                      {c("actions.copy")}
+                    </Button>
+                  </Space.Compact>
+                </Descriptions.Item>
+              )}
+              <Descriptions.Item label={c("fields.howHeardAbout")}>
                 {viewingTeam.howHeardAbout || "-"}
               </Descriptions.Item>
-              <Descriptions.Item label="Comments">{viewingTeam.comments || "-"}</Descriptions.Item>
-              <Descriptions.Item label="Vehicle description">
+              <Descriptions.Item label={c("fields.comments")}>{viewingTeam.comments || "-"}</Descriptions.Item>
+              <Descriptions.Item label={c("fields.vehicleDescription")}>
                 {viewingTeam.vehicleDescription || "-"}
               </Descriptions.Item>
-              <Descriptions.Item label="Vehicle documents">
+              <Descriptions.Item label={c("fields.vehicleDocuments")}>
                 {viewingTeam.vehicleDocuments.length}
               </Descriptions.Item>
             </Descriptions>
 
             <div>
-              <div className="font-semibold mb-2">Members</div>
-              <Table<TeamModerationMember>
-                dataSource={viewingTeam.members}
-                rowKey="key"
+              <div className="font-semibold mb-2">{c("sections.members")}</div>
+              <Table<TeamModerationMemberRow>
+                dataSource={viewingTeamMemberRows}
+                rowKey={(record) => `${record.status}-${record.key}`}
                 size="small"
                 pagination={false}
+                loading={pendingTeamMembersLoading}
                 columns={[
                   {
-                    title: "Name",
+                    title: c("columns.name"),
                     dataIndex: "fullName",
                     key: "fullName",
                   },
                   {
-                    title: "Role",
+                    title: c("columns.role"),
                     dataIndex: "role",
                     key: "role",
-                    render: (value: string | undefined) => teamRoleLabel(value),
+                    render: (value: string | undefined) => formatTeamRoleLabel(value),
                   },
                   {
-                    title: "Date of birth",
+                    title: c("columns.dateOfBirth"),
                     dataIndex: "dateOfBirth",
                     key: "dateOfBirth",
                     render: (value: string | undefined) => (value ? formatDisplayDate(value) : "-"),
                   },
                   {
-                    title: "Institution",
+                    title: c("columns.institution"),
                     dataIndex: "educationalInstitution",
                     key: "educationalInstitution",
                     render: (value: string | undefined) => value || "-",
                   },
                   {
-                    title: "Contact",
+                    title: c("columns.status"),
+                    key: "status",
+                    render: (_: unknown, record: TeamModerationMemberRow) =>
+                      record.status === "pending" ? (
+                        <Tag color="orange">{c("statuses.pending")}</Tag>
+                      ) : (
+                        <Tag color="green">{c("statuses.accepted")}</Tag>
+                      ),
+                  },
+                  {
+                    title: c("columns.contact"),
                     key: "contact",
-                    render: (_: unknown, record: TeamModerationMember) =>
+                    render: (_: unknown, record: TeamModerationMemberRow) =>
                       [record.email, record.phone].filter(Boolean).join(" / ") || "-",
+                  },
+                  {
+                    title: c("columns.actions"),
+                    key: "actions",
+                    width: 110,
+                    render: (_: unknown, record: TeamModerationMemberRow) => {
+                      const pendingApplicationKey = record.pendingApplicationKey;
+                      if (
+                        record.status !== "pending" ||
+                        !pendingApplicationKey ||
+                        !canAcceptPendingMembers
+                      ) {
+                        return "-";
+                      }
+
+                      return (
+                        <Button
+                          size="small"
+                          type="primary"
+                          loading={acceptingPendingMemberKey === pendingApplicationKey}
+                          onClick={() => handleAcceptPendingMember(pendingApplicationKey)}
+                        >
+                          {c("actions.accept")}
+                        </Button>
+                      );
+                    },
                   },
                 ]}
               />
@@ -1274,39 +1551,39 @@ const CabinetPage: React.FC = () => {
 
       <Modal
         open={editingTeamId !== null}
-        title="Edit Team"
+        title={c("modals.editTeam")}
         onCancel={() => setEditingTeamId(null)}
         onOk={handleSaveEditedTeam}
-        okText="Save"
+        okText={c("actions.save")}
         width={900}
       >
         <Form form={adminTeamForm} layout="vertical">
           <Form.Item
             name="name"
-            label="Team name"
-            rules={[{ required: true, message: "Team name is required." }]}
+            label={c("fields.teamName")}
+            rules={[{ required: true, message: c("validation.teamNameRequired") }]}
           >
             <Input />
           </Form.Item>
-          <Form.Item name="description" label="Team description">
+          <Form.Item name="description" label={c("fields.teamDescription")}>
             <Input.TextArea rows={3} />
           </Form.Item>
           <Form.Item name="profilePicture" hidden>
             <Input />
           </Form.Item>
           <div className="mb-4">
-            <div className="font-semibold mb-2">Team profile picture</div>
+            <div className="font-semibold mb-2">{c("fields.teamProfilePicture")}</div>
             {watchedAdminTeamProfilePicture ? (
               <div className="mb-2">
                 <Image
                   src={watchedAdminTeamProfilePicture}
-                  alt="Team profile"
+                  alt={c("alt.teamProfile")}
                   width={140}
                   className="rounded"
                 />
               </div>
             ) : (
-              <Text type="secondary">No team profile picture uploaded.</Text>
+              <Text type="secondary">{c("empty.noTeamProfilePicture")}</Text>
             )}
             <div className="mt-2 flex items-center gap-3 flex-wrap">
               <input
@@ -1319,7 +1596,7 @@ const CabinetPage: React.FC = () => {
                     const encoded = await readFileAsDataUrl(file);
                     adminTeamForm.setFieldValue("profilePicture", encoded);
                   } catch {
-                    message.error("Failed to read profile picture.");
+                    message.error(c("messages.profilePictureReadFailed"));
                   } finally {
                     event.target.value = "";
                   }
@@ -1327,17 +1604,17 @@ const CabinetPage: React.FC = () => {
               />
               {watchedAdminTeamProfilePicture && (
                 <Button onClick={() => adminTeamForm.setFieldValue("profilePicture", "")}>
-                  Remove picture
+                  {c("actions.removePicture")}
                 </Button>
               )}
             </div>
           </div>
-          <Form.Item name="vehicleDescription" label="Vehicle description">
+          <Form.Item name="vehicleDescription" label={c("fields.vehicleDescription")}>
             <Input.TextArea rows={3} />
           </Form.Item>
         </Form>
 
-        <div className="font-semibold mb-2">Vehicle pictures</div>
+        <div className="font-semibold mb-2">{c("fields.vehiclePictures")}</div>
         <input
           type="file"
           accept="image/*"
@@ -1350,7 +1627,7 @@ const CabinetPage: React.FC = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3 mb-4">
           {adminTeamPictures.map((picture) => (
             <div key={picture} className="border rounded p-2">
-              <Image src={picture} alt="Vehicle" className="rounded" />
+              <Image src={picture} alt={c("alt.vehicle")} className="rounded" />
               <Button
                 type="link"
                 danger
@@ -1358,13 +1635,13 @@ const CabinetPage: React.FC = () => {
                   setAdminTeamPictures((prev) => prev.filter((item) => item !== picture))
                 }
               >
-                Remove
+                {c("actions.remove")}
               </Button>
             </div>
           ))}
         </div>
 
-        <div className="font-semibold mb-2">Vehicle documents</div>
+        <div className="font-semibold mb-2">{c("fields.vehicleDocuments")}</div>
         <input
           type="file"
           multiple
@@ -1387,7 +1664,7 @@ const CabinetPage: React.FC = () => {
                   setAdminTeamDocuments((prev) => prev.filter((item) => item.id !== document.id))
                 }
               >
-                Delete
+                {c("actions.delete")}
               </Button>
             </div>
           ))}
@@ -1395,7 +1672,7 @@ const CabinetPage: React.FC = () => {
 
         {editingTeamId && (
           <>
-            <div className="font-semibold mb-2">Team members</div>
+            <div className="font-semibold mb-2">{c("sections.teamMembers")}</div>
             <Table<PublicUserRecord>
               dataSource={adminTeamMembers}
               rowKey="id"
@@ -1403,19 +1680,19 @@ const CabinetPage: React.FC = () => {
               pagination={false}
               columns={[
                 {
-                  title: "Name",
+                  title: c("columns.name"),
                   key: "name",
                   render: (_: unknown, record: PublicUserRecord) => record.profile.name || "-",
                 },
                 {
-                  title: "Role",
+                  title: c("columns.role"),
                   key: "role",
                   render: (_: unknown, record: PublicUserRecord) => (
-                    <Tag color={roleColor(record.role)}>{roleLabel(record.role)}</Tag>
+                    <Tag color={roleColor(record.role)}>{formatRoleLabel(record.role)}</Tag>
                   ),
                 },
                 {
-                  title: "Action",
+                  title: c("columns.action"),
                   key: "action",
                   width: 120,
                   render: (_: unknown, record: PublicUserRecord) => (
@@ -1425,7 +1702,7 @@ const CabinetPage: React.FC = () => {
                       icon={<DeleteOutlined />}
                       onClick={() => handleKickFromAdminTeam(editingTeamId, record.id)}
                     >
-                      Kick
+                      {c("actions.kick")}
                     </Button>
                   ),
                 },

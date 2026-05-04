@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Button, Card, Form, Input, Select, Typography, message } from "antd";
-import { Link, useNavigate } from "react-router-dom";
+import { Alert, Button, Card, Form, Input, Select, Typography, message } from "antd";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/webapp/authentification/AuthContext";
 import { ENDPOINT_AUTH_REGISTER, ENDPOINT_TEAMS } from "@/webapp/config/endpoints";
@@ -11,6 +11,7 @@ import customParseFormat from "dayjs/plugin/customParseFormat";
 dayjs.extend(customParseFormat);
 
 const { Title, Text } = Typography;
+const SIGNUP_DRAFT_STORAGE_KEY = "signup-form-draft";
 
 type AccountTeamRole = "participant" | "team_leader" | "pilot" | "reserve_pilot";
 
@@ -30,6 +31,8 @@ interface SignUpValues {
   teamId?: string;
   teamRole?: AccountTeamRole;
 }
+
+type SignUpDraftValues = Omit<SignUpValues, "password" | "confirmPassword">;
 
 const formatDateInput = (input: string): string => {
   const digits = input.replace(/\D/g, "");
@@ -63,9 +66,102 @@ function normalizeTeam(value: unknown, index: number): SelectableTeam | null {
   const name = firstNonEmpty([value.teamName, value.komandasNosaukums, value.name], "");
   if (!name) return null;
   return {
-    id: firstNonEmpty([value.key, value.id, value.teamId], name || `team-${index + 1}`),
+    id: firstNonEmpty([value.key, value.id, value.ID, value.teamId], name || `team-${index + 1}`),
     name,
   };
+}
+
+function getTeamResponseItems(payload: unknown): unknown[] {
+  if (Array.isArray(payload)) return payload;
+  if (!isRecord(payload)) return [];
+
+  const nestedPayloads = [payload.teams, payload.komandas, payload.applications, payload.data, payload.team];
+  for (const nested of nestedPayloads) {
+    if (Array.isArray(nested)) return nested;
+    if (isRecord(nested)) return [nested];
+  }
+
+  if (typeof payload.teamName === "string" || typeof payload.komandasNosaukums === "string") {
+    return [payload];
+  }
+
+  return [];
+}
+
+function responseIndicatesPendingVerification(payload: unknown): boolean {
+  if (typeof payload === "string") {
+    try {
+      return responseIndicatesPendingVerification(JSON.parse(payload));
+    } catch {
+      return payload.toLowerCase().includes("pending verification");
+    }
+  }
+
+  if (!isRecord(payload)) return false;
+
+  const status = firstNonEmpty([payload.status, payload.state, payload.result], "").toLowerCase();
+  const message = firstNonEmpty([payload.message, payload.detail, payload.description], "").toLowerCase();
+  const combined = `${status} ${message}`;
+
+  return (
+    status === "pending" ||
+    status === "pending_verification" ||
+    status === "verification_pending" ||
+    combined.includes("pending verification") ||
+    combined.includes("verification pending")
+  );
+}
+
+function getStoredSignUpDraft(): SignUpDraftValues | null {
+  try {
+    const stored = localStorage.getItem(SIGNUP_DRAFT_STORAGE_KEY);
+    if (!stored) return null;
+    const parsed: unknown = JSON.parse(stored);
+    if (!isRecord(parsed)) return null;
+
+    return {
+      username: firstNonEmpty([parsed.username], ""),
+      name: firstNonEmpty([parsed.name], ""),
+      dateOfBirth: firstNonEmpty([parsed.dateOfBirth], ""),
+      phone: firstNonEmpty([parsed.phone], ""),
+      email: firstNonEmpty([parsed.email], ""),
+      teamId: firstNonEmpty([parsed.teamId], "") || undefined,
+      teamRole: firstNonEmpty([parsed.teamRole], "") as AccountTeamRole | undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function getStorableSignUpDraft(values: Partial<SignUpValues>): SignUpDraftValues {
+  return {
+    username: values.username || "",
+    name: values.name || "",
+    dateOfBirth: values.dateOfBirth || "",
+    phone: values.phone || "",
+    email: values.email || "",
+    teamId: values.teamId,
+    teamRole: values.teamRole,
+  };
+}
+
+function saveSignUpDraft(values: Partial<SignUpValues>) {
+  try {
+    localStorage.setItem(
+      SIGNUP_DRAFT_STORAGE_KEY,
+      JSON.stringify(getStorableSignUpDraft(values))
+    );
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function clearSignUpDraft() {
+  try {
+    localStorage.removeItem(SIGNUP_DRAFT_STORAGE_KEY);
+  } catch {
+    // ignore storage errors
+  }
 }
 
 function getLocalTeams(): SelectableTeam[] {
@@ -77,11 +173,33 @@ function getLocalTeams(): SelectableTeam[] {
 const SignUpPage: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { login, isAuthenticated } = useAuth();
   const [form] = Form.useForm<SignUpValues>();
   const selectedTeamId = Form.useWatch("teamId", form);
   const [teams, setTeams] = useState<SelectableTeam[]>(() => getLocalTeams());
   const [teamsLoading, setTeamsLoading] = useState(false);
+  const leaderVerificationId = (
+    searchParams.get("uniqueID") ??
+    searchParams.get("uniqueId") ??
+    ""
+  ).trim();
+  const isLeaderVerification = leaderVerificationId.length > 0;
+  const leaderVerificationTeam = useMemo(
+    () => teams.find((team) => team.id === leaderVerificationId),
+    [leaderVerificationId, teams]
+  );
+
+  useEffect(() => {
+    const draft = getStoredSignUpDraft();
+    if (!draft) return;
+
+    form.setFieldsValue({
+      ...draft,
+      teamId: isLeaderVerification ? leaderVerificationId : draft.teamId,
+      teamRole: isLeaderVerification ? "team_leader" : draft.teamRole ?? "participant",
+    });
+  }, [form, isLeaderVerification, leaderVerificationId]);
 
   useEffect(() => {
     let active = true;
@@ -93,13 +211,7 @@ const SignUpPage: React.FC = () => {
         return response.json() as Promise<unknown>;
       })
       .then((payload) => {
-        const rawTeams = Array.isArray(payload)
-          ? payload
-          : isRecord(payload) && Array.isArray(payload.teams)
-            ? payload.teams
-            : isRecord(payload) && Array.isArray(payload.data)
-              ? payload.data
-              : [];
+        const rawTeams = getTeamResponseItems(payload);
         const normalized = rawTeams
           .map((item, index) => normalizeTeam(item, index))
           .filter((item): item is SelectableTeam => item !== null)
@@ -119,6 +231,18 @@ const SignUpPage: React.FC = () => {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!isLeaderVerification) return;
+    form.setFieldsValue({
+      teamId: leaderVerificationId,
+      teamRole: "team_leader",
+    });
+  }, [form, isLeaderVerification, leaderVerificationId]);
+
+  const handleValuesChange = () => {
+    saveSignUpDraft(form.getFieldsValue());
+  };
 
   const teamOptions = useMemo(
     () => teams.map((team) => ({ value: team.id, label: team.name })),
@@ -165,14 +289,22 @@ const SignUpPage: React.FC = () => {
       const selectedTeam = values.teamId
         ? teams.find((team) => team.id === values.teamId)
         : undefined;
+      const teamForRegistration = isLeaderVerification ? leaderVerificationTeam : selectedTeam;
 
-      if (values.teamId && !selectedTeam) {
+      if (!isLeaderVerification && values.teamId && !selectedTeam) {
         throw new Error("Team not found");
       }
 
-      const role = values.teamId ? values.teamRole ?? "participant" : "member";
+      const role = isLeaderVerification
+        ? "team_leader"
+        : values.teamId
+          ? values.teamRole ?? "participant"
+          : "member";
+      const registerEndpoint = isLeaderVerification
+        ? `${ENDPOINT_AUTH_REGISTER}?uniqueID=${encodeURIComponent(leaderVerificationId)}`
+        : ENDPOINT_AUTH_REGISTER;
 
-      const response = await fetch(ENDPOINT_AUTH_REGISTER, {
+      const response = await fetch(registerEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -182,7 +314,7 @@ const SignUpPage: React.FC = () => {
           lietotajvards: values.username,
           epasts: values.email,
           telefonanumurs: values.phone,
-          komandasNosaukums: selectedTeam?.name ?? "",
+          komandasNosaukums: teamForRegistration?.name ?? "",
           role,
         }),
       });
@@ -191,6 +323,18 @@ const SignUpPage: React.FC = () => {
         throw new Error(`Registration failed with HTTP ${response.status}`);
       }
 
+      const payload = await response
+        .clone()
+        .json()
+        .catch(() => null);
+
+      if (responseIndicatesPendingVerification(payload)) {
+        clearSignUpDraft();
+        message.info(t("website.auth.accountPendingVerification"), 8);
+        return;
+      }
+
+      clearSignUpDraft();
       await login(values.username, values.password);
       message.success(t("website.auth.accountCreated"));
       navigate("/cabinet");
@@ -224,13 +368,34 @@ const SignUpPage: React.FC = () => {
             {t("website.nav.signUp", { defaultValue: "Sign up" })}
           </Title>
           <Text type="secondary">{t("website.auth.signUpSubtitle")}</Text>
+          {isLeaderVerification && (
+            <Alert
+              className="mt-4"
+              showIcon
+              type="info"
+              message={t("website.auth.teamLeaderVerificationTitle")}
+              description={
+                <div>
+                  {t("website.auth.teamLeaderVerificationDescription")}
+                  <div className="mt-2">
+                    {t("website.auth.teamLeaderVerificationTeam")}:{" "}
+                    <Text strong>{leaderVerificationTeam?.name ?? leaderVerificationId}</Text>
+                  </div>
+                </div>
+              }
+            />
+          )}
 
           <Form<SignUpValues>
             form={form}
             layout="vertical"
             className="mt-6"
-            initialValues={{ teamRole: "participant" }}
+            initialValues={{
+              teamId: isLeaderVerification ? leaderVerificationId : undefined,
+              teamRole: isLeaderVerification ? "team_leader" : "participant",
+            }}
             onFinish={handleSubmit}
+            onValuesChange={handleValuesChange}
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Form.Item
@@ -320,18 +485,27 @@ const SignUpPage: React.FC = () => {
                 <Input autoComplete="email" />
               </Form.Item>
 
-              <Form.Item name="teamId" label={t("website.auth.joinTeamOptional")}>
-                <Select
-                  allowClear
-                  showSearch
-                  loading={teamsLoading}
-                  optionFilterProp="label"
-                  placeholder={t("website.auth.joinTeamOptional")}
-                  options={teamOptions}
-                />
-              </Form.Item>
+              {isLeaderVerification ? (
+                <Form.Item label="Team verification">
+                  <Input
+                    readOnly
+                    value={leaderVerificationTeam?.name ?? leaderVerificationId}
+                  />
+                </Form.Item>
+              ) : (
+                <Form.Item name="teamId" label={t("website.auth.joinTeamOptional")}>
+                  <Select
+                    allowClear
+                    showSearch
+                    loading={teamsLoading}
+                    optionFilterProp="label"
+                    placeholder={t("website.auth.joinTeamOptional")}
+                    options={teamOptions}
+                  />
+                </Form.Item>
+              )}
 
-              {selectedTeamId && (
+              {!isLeaderVerification && selectedTeamId && (
                 <Form.Item
                   name="teamRole"
                   label={t("website.apply.form.memberRole")}

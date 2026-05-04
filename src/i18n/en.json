@@ -244,6 +244,7 @@
       "passwordRequired": "Password is required.",
       "signUpSubtitle": "Create participant account for profile cabinet access.",
       "accountCreated": "Account created.",
+      "accountPendingVerification": "Your application is pending verification. Please wait until the team leader accepts your application.",
       "signUpFailed": "Sign up failed.",
       "usernameTaken": "Username is already taken.",
       "teamNotFound": "Selected team was not found.",
@@ -268,7 +269,10 @@
       "inviteInvalid": "Invite code is invalid.",
       "inviteUsed": "Invite code has already been used.",
       "inviteTeamMismatch": "Invite code does not match selected team.",
-      "inviteLinkDetected": "Invitation link detected. Team will be assigned after sign up."
+      "inviteLinkDetected": "Invitation link detected. Team will be assigned after sign up.",
+      "teamLeaderVerificationTitle": "Team leader verification",
+      "teamLeaderVerificationDescription": "Check that your full name, date of birth, e-mail, and phone match the team application before submitting this form.",
+      "teamLeaderVerificationTeam": "Team application"
     },
     "landing": {
       "heroTitle": "Energy Efficiency Competition (E-ES)",
@@ -475,6 +479,156 @@
           "duplicateReservePilot": "There can only be one reserve pilot in the team",
           "duplicateTeamLeader": "There can only be one team leader in the team"
         }
+      }
+    },
+    "cabinet": {
+      "title": "Profile Cabinet",
+      "roles": {
+        "participant": "Participant",
+        "member": "Participant",
+        "team_leader": "Team Leader",
+        "teamLeader": "Team Leader",
+        "team leader": "Team Leader",
+        "pilot": "Pilot",
+        "reserve_pilot": "Reserve Pilot",
+        "reservePilot": "Reserve Pilot",
+        "supervisor": "Supervisor",
+        "admin": "Admin",
+        "super_admin": "Super Admin",
+        "superAdmin": "Super Admin"
+      },
+      "cards": {
+        "myProfile": "My Profile",
+        "accountActions": "Account Actions",
+        "roleTeamModeration": "Role: Team Moderation",
+        "superAdminUserModeration": "Super Admin: User Moderation",
+        "superAdminTeamModeration": "Super Admin: Team Moderation"
+      },
+      "modals": {
+        "editUser": "Edit User",
+        "teamDetails": "Team details",
+        "editTeam": "Edit Team"
+      },
+      "fields": {
+        "username": "Username",
+        "name": "Name",
+        "dateOfBirth": "Date of birth",
+        "school": "School",
+        "grade": "Grade",
+        "phone": "Phone",
+        "email": "E-mail",
+        "profilePicture": "Profile picture",
+        "role": "Role",
+        "team": "Team",
+        "status": "Status",
+        "ageGroup": "Age group",
+        "institution": "Institution",
+        "cityOrRegion": "City/region",
+        "applied": "Applied",
+        "responsiblePerson": "Responsible person",
+        "responsibleContact": "Responsible contact",
+        "leaderVerificationLink": "Leader verification link",
+        "howHeardAbout": "How heard about",
+        "comments": "Comments",
+        "vehicleDescription": "Vehicle description",
+        "vehicleDocuments": "Vehicle documents",
+        "vehiclePictures": "Vehicle pictures",
+        "teamName": "Team name",
+        "teamDescription": "Team description",
+        "teamProfilePicture": "Team profile picture"
+      },
+      "columns": {
+        "user": "User",
+        "dateOfBirth": "Date of birth",
+        "role": "Role",
+        "team": "Team",
+        "actions": "Actions",
+        "action": "Action",
+        "status": "Status",
+        "ageGroup": "Age group",
+        "vehicleDocs": "Vehicle docs",
+        "name": "Name",
+        "institution": "Institution",
+        "contact": "Contact"
+      },
+      "sections": {
+        "members": "Members",
+        "teamMembers": "Team members"
+      },
+      "statuses": {
+        "pending": "Pending",
+        "accepted": "Accepted"
+      },
+      "labels": {
+        "role": "Role",
+        "membersCount": "{{count}} member",
+        "membersCount_plural": "{{count}} members"
+      },
+      "empty": {
+        "noTeamAssigned": "No team assigned.",
+        "noTeam": "No team",
+        "noProfilePicture": "No profile picture uploaded.",
+        "noTeamProfilePicture": "No team profile picture uploaded."
+      },
+      "actions": {
+        "goToLogin": "Go to login",
+        "edit": "Edit",
+        "view": "View",
+        "save": "Save",
+        "saveProfile": "Save profile",
+        "exitTeam": "Exit from team",
+        "deleteAccount": "Delete account",
+        "removePicture": "Remove picture",
+        "copy": "Copy",
+        "close": "Close",
+        "accept": "Accept",
+        "remove": "Remove",
+        "delete": "Delete",
+        "kick": "Kick"
+      },
+      "alt": {
+        "profile": "Profile",
+        "teamProfile": "Team profile",
+        "vehicle": "Vehicle"
+      },
+      "validation": {
+        "usernameRequired": "Username is required.",
+        "nameRequired": "Name is required.",
+        "roleRequired": "Role is required.",
+        "dateOfBirthRequired": "Date of birth is required.",
+        "invalidDate": "Invalid date format (use DD.MM.YYYY).",
+        "emailInvalid": "Please enter a valid e-mail.",
+        "teamNameRequired": "Team name is required."
+      },
+      "confirm": {
+        "leaveTeam": "Leave current team?",
+        "deleteAccount": "Delete your account permanently?",
+        "deleteTeam": "Delete team \"{{name}}\"?",
+        "kickMember": "Kick this member from team?"
+      },
+      "messages": {
+        "noSession": "No active user session. Please log in again.",
+        "usersLoadFallback": "Could not load users from server. Showing local users.",
+        "teamsLoadFallback": "Could not load teams from server. Showing local teams.",
+        "pendingMembersLoadFailed": "Could not load pending team members.",
+        "profileUpdated": "Profile updated.",
+        "profileSaveFailed": "Failed to save profile.",
+        "leftTeam": "You left the team.",
+        "leaveTeamFailed": "Failed to leave team.",
+        "leaderLinkCopied": "Leader verification link copied.",
+        "leaderLinkCopyFailed": "Could not copy leader verification link.",
+        "pendingMemberAccepted": "Pending team member accepted.",
+        "pendingMemberAcceptFailed": "Failed to accept pending team member.",
+        "imageReadFailed": "Failed to read image files.",
+        "documentReadFailed": "Failed to read document files.",
+        "profilePictureReadFailed": "Failed to read profile picture.",
+        "userNotFound": "User not found",
+        "userUpdated": "User updated.",
+        "userUpdateFailed": "Failed to update user.",
+        "teamUpdated": "Team updated.",
+        "teamUpdateFailed": "Failed to update team.",
+        "teamDeleted": "Team deleted.",
+        "memberRemoved": "Member removed."
       }
     },
     "footer": {
