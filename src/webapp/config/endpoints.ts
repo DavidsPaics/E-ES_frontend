@@ -7,13 +7,19 @@
 //   VITE_MAPTILER_KEY=your-key
 
 const env = import.meta.env;
-export const BASE_URL = env.VITE_API_BASE_URL ?? "https://e-es.lvvv";
+export const BASE_URL = env.VITE_API_BASE_URL ?? "https://e-es.lv";
 
 // Auth endpoints
 export const ENDPOINT_AUTH_LOGIN = `${BASE_URL}/api/login`;
+export const ENDPOINT_AUTH_REGISTER = `${BASE_URL}/api/register`;
 
 // User endpoints
 export const ENDPOINT_USERS = `${BASE_URL}/api/users`;
+export const ENDPOINT_ACCOUNTS = `${BASE_URL}/api/accounts`;
+export const ENDPOINT_ACCOUNT_APPLICATIONS = `${BASE_URL}/api/account-applications`;
+export const ENDPOINT_ACCOUNT_VERIFICATION_INFO = `${BASE_URL}/api/account-verification-info`;
+export const ENDPOINT_VERIFY_ACCOUNT_APPLICATION = `${BASE_URL}/api/verify-account-application`;
+export const ENDPOINT_ADMIN_ACCOUNTS = `${BASE_URL}/api/admin-accounts`;
 
 // Competitor endpoints
 export const ENDPOINT_COMPETITORS = `${BASE_URL}/api/cars`;

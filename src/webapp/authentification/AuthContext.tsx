@@ -1,9 +1,18 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { decodeToken, fakeLogin, fakeVerify } from "./fakeAuth";
-import { getUserById, type PublicUserRecord } from "@/shared/cabinet/store";
+import { createContext, useContext, useState, type ReactNode } from "react";
+import {
+  clearStoredCredentials,
+  getStoredAuthUser,
+  getStoredCredentials,
+  makeBasicAuthHeader,
+  storeAuthUser,
+  storeCredentials,
+  type AuthCredentials,
+} from "./credentials";
+import { getAllUsers, type PublicUserRecord } from "@/shared/cabinet/store";
+import { ENDPOINT_AUTH_LOGIN } from "@/webapp/config/endpoints";
 
 interface AuthContextType {
-  token: string | null;
+  credentials: AuthCredentials | null;
   currentUser: PublicUserRecord | null;
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
@@ -13,46 +22,142 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function firstString(values: unknown[], fallback = ""): string {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number") return String(value);
+  }
+  return fallback;
+}
+
+function normalizeRole(value: unknown): PublicUserRecord["role"] {
+  if (value === "member") return "participant";
+  if (
+    value === "participant" ||
+    value === "team_leader" ||
+    value === "supervisor" ||
+    value === "admin" ||
+    value === "super_admin"
+  ) {
+    return value;
+  }
+  return "participant";
+}
+
+function unwrapLoginPayload(payload: unknown): unknown {
+  if (!isRecord(payload)) return payload;
+  return payload.user ?? payload.account ?? payload.admin ?? payload.person ?? payload.data ?? payload;
+}
+
+function normalizeLoginUser(payload: unknown, username: string): PublicUserRecord {
+  const source = unwrapLoginPayload(payload);
+  if (!isRecord(source)) return makeSessionUser(username);
+
+  const teamMember = isRecord(source.cilveks) ? source.cilveks : undefined;
+  const profileSource = isRecord(source.profile) ? source.profile : teamMember ?? source;
+  const normalizedUsername = firstString([source.username, source.login, source.email], username);
+  const isAdminInfo = "superadmin" in source;
+
+  return {
+    id: firstString(
+      [source.key, source.id, source.ID, source.userId, source.accountId, teamMember?.key, teamMember?.id],
+      `session-${normalizedUsername}`
+    ),
+    username: normalizedUsername,
+    role: isAdminInfo
+      ? source.superadmin === true
+        ? "super_admin"
+        : "admin"
+      : normalizeRole(profileSource.role ?? source.role ?? source.type),
+    teamId: firstString([source.teamId, source.team_id], "") || undefined,
+    profile: {
+      name: firstString([profileSource.name, profileSource.fullName, profileSource.full_name], normalizedUsername),
+      dateOfBirth: firstString([profileSource.dateOfBirth], "") || undefined,
+      school: firstString([profileSource.school, profileSource.educationalInstitution], ""),
+      grade: firstString([profileSource.grade, profileSource.classOrYear], ""),
+      phone: firstString([source.phoneNumber, profileSource.phone, profileSource.phoneNumber], ""),
+      email: firstString([source.email, profileSource.email], ""),
+      profilePicture: firstString([profileSource.profilePicture, profileSource.avatar], ""),
+      aboutMe: firstString([profileSource.aboutMe, profileSource.bio], ""),
+    },
+  };
+}
+
+function makeSessionUser(username: string): PublicUserRecord {
+  const storedUser = getAllUsers().find(
+    (user) => user.username.toLowerCase() === username.toLowerCase()
+  );
+  if (storedUser) return storedUser;
+
+  return {
+    id: `session-${username}`,
+    username,
+    role: "super_admin",
+    profile: {
+      name: username,
+      school: "",
+      grade: "",
+      phone: "",
+      email: "",
+      profilePicture: "",
+      aboutMe: "",
+    },
+  };
+}
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [token, setToken] = useState<string | null>(localStorage.getItem("token"));
-  const [currentUser, setCurrentUser] = useState<PublicUserRecord | null>(null);
+  const [credentials, setCredentials] = useState<AuthCredentials | null>(() => getStoredCredentials());
+  const [currentUser, setCurrentUser] = useState<PublicUserRecord | null>(() =>
+    getStoredAuthUser<PublicUserRecord>()
+  );
 
   const refreshCurrentUser = () => {
-    if (!token) {
-      setCurrentUser(null);
-      return;
-    }
-
-    const payload = decodeToken(token);
-    if (!payload) {
-      setCurrentUser(null);
-      return;
-    }
-
-    const user = getUserById(payload.userId);
-    setCurrentUser(user);
+    const storedCredentials = getStoredCredentials();
+    setCredentials(storedCredentials);
+    setCurrentUser(getStoredAuthUser<PublicUserRecord>());
   };
 
   const login = async (username: string, password: string) => {
-    const fakeToken = await fakeLogin(username, password);
-    localStorage.setItem("token", fakeToken);
-    setToken(fakeToken);
+    const trimmedUsername = username.trim();
+    if (!trimmedUsername || !password) {
+      throw new Error("Username and password are required");
+    }
+
+    const nextCredentials = { username: trimmedUsername, password };
+    const response = await fetch(ENDPOINT_AUTH_LOGIN, {
+      method: "GET",
+      headers: {
+        Authorization: makeBasicAuthHeader(nextCredentials),
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Login failed with HTTP ${response.status}`);
+    }
+
+    const payload: unknown = await response.json().catch(() => ({}));
+    const authenticatedUser = normalizeLoginUser(payload, trimmedUsername);
+
+    storeCredentials(nextCredentials);
+    storeAuthUser(authenticatedUser);
+    setCredentials(nextCredentials);
+    setCurrentUser(authenticatedUser);
   };
 
   const logout = () => {
-    localStorage.removeItem("token");
-    setToken(null);
+    clearStoredCredentials();
+    setCredentials(null);
     setCurrentUser(null);
   };
 
-  useEffect(() => {
-    refreshCurrentUser();
-  }, [token]);
-
-  const isAuthenticated = token !== null && fakeVerify(token);
+  const isAuthenticated = credentials !== null && currentUser !== null;
 
   return (
-    <AuthContext.Provider value={{ token, currentUser, login, logout, isAuthenticated, refreshCurrentUser }}>
+    <AuthContext.Provider value={{ credentials, currentUser, login, logout, isAuthenticated, refreshCurrentUser }}>
       {children}
     </AuthContext.Provider>
   );

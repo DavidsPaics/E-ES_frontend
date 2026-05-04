@@ -62,8 +62,6 @@ const LiveDataTV: React.FC = () => {
 
   // WebSocket connection
   useEffect(() => {
-    const token = localStorage.getItem("auth_token") || "test_token";
-
     const attemptWebSocketConnection = () => {
       if (reconnectAttempts.current >= 3) {
         console.log("Max reconnect attempts reached, using fake data");
@@ -78,9 +76,7 @@ const LiveDataTV: React.FC = () => {
         return;
       }
 
-      const wsUrl = `${ENDPOINT_WS_LIVE}?token=${encodeURIComponent(token)}`;
-
-      wsRef.current = new WebSocket(wsUrl);
+      wsRef.current = new WebSocket(ENDPOINT_WS_LIVE);
 
       wsRef.current.onopen = () => {
         console.log("WebSocket connected");

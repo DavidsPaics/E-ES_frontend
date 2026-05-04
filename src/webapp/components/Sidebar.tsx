@@ -53,10 +53,10 @@ const Sidebar: React.FC = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated, currentUser, logout } = useAuth();
+  const { isAuthenticated, logout } = useAuth();
   const { t, i18n } = useTranslation();
   const { collapsed, setCollapsed } = useSidebar();
-  const isWebappAdmin = currentUser?.role === "admin" || currentUser?.role === "super_admin";
+  const isWebappAdmin = isAuthenticated;
 
   const toggleLanguage = () => {
     i18n.changeLanguage(i18n.language === "lv" ? "en" : "lv");

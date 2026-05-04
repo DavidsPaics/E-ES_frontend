@@ -9,9 +9,9 @@ type MenuItem = Required<MenuProps>['items'][number];
 
 const MainMenu: React.FC = () => {
   const navigate = useNavigate();
-  const { isAuthenticated, currentUser, logout } = useAuth();
+  const { isAuthenticated, logout } = useAuth();
   const { t, i18n } = useTranslation();
-  const isWebappAdmin = currentUser?.role === "admin" || currentUser?.role === "super_admin";
+  const isWebappAdmin = isAuthenticated;
 
   const toggleLanguage = () => {
     i18n.changeLanguage(i18n.language === 'lv' ? 'en' : 'lv');

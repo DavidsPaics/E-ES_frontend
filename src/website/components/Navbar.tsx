@@ -74,54 +74,60 @@ const Navbar: React.FC = () => {
               </Link>
             )}
 
-            {!isProduction && (
-              <div className="relative group">
-                <Link
-                  to={isAuthenticated ? "/cabinet" : "/signin"}
-                  aria-label={t("website.nav.cabinet", { defaultValue: "Cabinet" })}
-                  className={`w-10 h-10 rounded-full border flex items-center justify-center transition-colors ${
-                    isActive("/cabinet")
-                      ? "border-[#4EA9D5] text-[#4EA9D5] bg-[#4EA9D5]/10"
-                      : "border-[#0A306D]/20 text-[#0A306D] hover:text-[#4EA9D5] hover:border-[#4EA9D5]/40"
-                  }`}
-                >
-                  <UserOutlined />
-                </Link>
+            <div className="relative group">
+              <Link
+                to={isAuthenticated ? "/cabinet" : "/signin"}
+                aria-label={t("website.nav.cabinet", { defaultValue: "Cabinet" })}
+                className={`w-10 h-10 rounded-full border flex items-center justify-center transition-colors ${
+                  isActive("/cabinet")
+                    ? "border-[#4EA9D5] text-[#4EA9D5] bg-[#4EA9D5]/10"
+                    : "border-[#0A306D]/20 text-[#0A306D] hover:text-[#4EA9D5] hover:border-[#4EA9D5]/40"
+                }`}
+              >
+                <UserOutlined />
+              </Link>
 
-                <div
-                  className="
-                    absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-lg
-                    opacity-0 invisible group-hover:opacity-100 group-hover:visible
-                    group-focus-within:opacity-100 group-focus-within:visible
-                    transition-all duration-150 z-50 overflow-hidden
-                  "
-                >
-                  {isAuthenticated ? (
+              <div
+                className="
+                  absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-lg
+                  opacity-0 invisible group-hover:opacity-100 group-hover:visible
+                  group-focus-within:opacity-100 group-focus-within:visible
+                  transition-all duration-150 z-50 overflow-hidden
+                "
+              >
+                {isAuthenticated ? (
+                  <>
+                    <Link
+                      to="/cabinet"
+                      className="block px-3 py-2 text-sm text-[#0A306D] hover:bg-gray-50"
+                    >
+                      {t("website.nav.cabinet", { defaultValue: "Cabinet" })}
+                    </Link>
                     <button
                       onClick={logout}
                       className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
                     >
                       {t("website.nav.logout", { defaultValue: "Log out" })}
                     </button>
-                  ) : (
-                    <>
-                      <Link
-                        to="/signin"
-                        className="block px-3 py-2 text-sm text-[#0A306D] hover:bg-gray-50"
-                      >
-                        {t("website.nav.signIn", { defaultValue: "Sign in" })}
-                      </Link>
-                      <Link
-                        to="/signup"
-                        className="block px-3 py-2 text-sm text-[#0A306D] hover:bg-gray-50"
-                      >
-                        {t("website.nav.signUp", { defaultValue: "Sign up" })}
-                      </Link>
-                    </>
-                  )}
-                </div>
+                  </>
+                ) : (
+                  <>
+                    <Link
+                      to="/signin"
+                      className="block px-3 py-2 text-sm text-[#0A306D] hover:bg-gray-50"
+                    >
+                      {t("website.nav.signIn", { defaultValue: "Sign in" })}
+                    </Link>
+                    <Link
+                      to="/signup"
+                      className="block px-3 py-2 text-sm text-[#0A306D] hover:bg-gray-50"
+                    >
+                      {t("website.nav.signUp", { defaultValue: "Sign up" })}
+                    </Link>
+                  </>
+                )}
               </div>
-            )}
+            </div>
           </div>
 
           {/* Mobile hamburger */}
@@ -166,48 +172,46 @@ const Navbar: React.FC = () => {
                 </Link>
               )}
 
-              {!isProduction && (
-                <div className="flex items-center gap-2">
-                  {isAuthenticated ? (
-                    <>
-                      <Link
-                        to="/cabinet"
-                        onClick={() => setMobileOpen(false)}
-                        aria-label={t("website.nav.cabinet", { defaultValue: "Cabinet" })}
-                        className="w-9 h-9 rounded-full border border-[#0A306D]/20 text-[#0A306D] flex items-center justify-center"
-                      >
-                        <UserOutlined />
-                      </Link>
-                      <button
-                        onClick={() => {
-                          logout();
-                          setMobileOpen(false);
-                        }}
-                        className="text-sm text-red-600 font-medium"
-                      >
-                        {t("website.nav.logout", { defaultValue: "Log out" })}
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <Link
-                        to="/signin"
-                        onClick={() => setMobileOpen(false)}
-                        className="text-sm text-[#0A306D] font-medium"
-                      >
-                        {t("website.nav.signIn", { defaultValue: "Sign in" })}
-                      </Link>
-                      <Link
-                        to="/signup"
-                        onClick={() => setMobileOpen(false)}
-                        className="text-sm text-[#0A306D] font-medium"
-                      >
-                        {t("website.nav.signUp", { defaultValue: "Sign up" })}
-                      </Link>
-                    </>
-                  )}
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                {isAuthenticated ? (
+                  <>
+                    <Link
+                      to="/cabinet"
+                      onClick={() => setMobileOpen(false)}
+                      aria-label={t("website.nav.cabinet", { defaultValue: "Cabinet" })}
+                      className="w-9 h-9 rounded-full border border-[#0A306D]/20 text-[#0A306D] flex items-center justify-center"
+                    >
+                      <UserOutlined />
+                    </Link>
+                    <button
+                      onClick={() => {
+                        logout();
+                        setMobileOpen(false);
+                      }}
+                      className="text-sm text-red-600 font-medium"
+                    >
+                      {t("website.nav.logout", { defaultValue: "Log out" })}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <Link
+                      to="/signin"
+                      onClick={() => setMobileOpen(false)}
+                      className="text-sm text-[#0A306D] font-medium"
+                    >
+                      {t("website.nav.signIn", { defaultValue: "Sign in" })}
+                    </Link>
+                    <Link
+                      to="/signup"
+                      onClick={() => setMobileOpen(false)}
+                      className="text-sm text-[#0A306D] font-medium"
+                    >
+                      {t("website.nav.signUp", { defaultValue: "Sign up" })}
+                    </Link>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         )}

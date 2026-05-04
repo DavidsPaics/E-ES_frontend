@@ -1,9 +1,13 @@
-import React, { useMemo } from "react";
-import { Alert, Button, Card, Form, Input, Select, Typography, message } from "antd";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import React from "react";
+import { Button, Card, Form, Input, Typography, message } from "antd";
+import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/webapp/authentification/AuthContext";
-import { createUser, getAllTeams } from "@/shared/cabinet/store";
+import { ENDPOINT_AUTH_REGISTER } from "@/webapp/config/endpoints";
+import dayjs from "dayjs";
+import customParseFormat from "dayjs/plugin/customParseFormat";
+
+dayjs.extend(customParseFormat);
 
 const { Title, Text } = Typography;
 
@@ -12,22 +16,30 @@ interface SignUpValues {
   password: string;
   confirmPassword: string;
   name: string;
-  school?: string;
-  grade?: string;
-  phone?: string;
-  email?: string;
-  teamId?: string;
+  dateOfBirth: string;
+  phone: string;
+  email: string;
 }
+
+const formatDateInput = (input: string): string => {
+  const digits = input.replace(/\D/g, "");
+  if (digits.length === 0) return "";
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}.${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}.${digits.slice(2, 4)}.${digits.slice(4, 8)}`;
+};
+
+const parseDateString = (input: string) => {
+  const formatted = formatDateInput(input);
+  if (formatted.length < 10) return null;
+  const parsed = dayjs(formatted, "DD.MM.YYYY", true);
+  return parsed.isValid() && !parsed.isAfter(dayjs(), "day") ? parsed : null;
+};
 
 const SignUpPage: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const location = useLocation();
   const { login, isAuthenticated } = useAuth();
-  const inviteCodeFromLink = useMemo(() => {
-    const value = new URLSearchParams(location.search).get("invite");
-    return value?.trim() || "";
-  }, [location.search]);
 
   const getLocalizedSignUpError = (error: unknown): string => {
     if (!(error instanceof Error)) return t("website.auth.signUpFailed");
@@ -52,31 +64,31 @@ const SignUpPage: React.FC = () => {
     }
   };
 
-  const teamOptions = useMemo(
-    () =>
-      getAllTeams().map((team) => ({
-        value: team.id,
-        label: team.name,
-      })),
-    []
-  );
-
   const handleSubmit = async (values: SignUpValues) => {
     try {
-      createUser({
-        username: values.username,
-        password: values.password,
-        role: "participant",
-        teamId: inviteCodeFromLink ? undefined : values.teamId,
-        inviteCode: inviteCodeFromLink || undefined,
-        profile: {
-          name: values.name,
-          school: values.school,
-          grade: values.grade,
-          phone: values.phone,
+      const dateOfBirth = parseDateString(values.dateOfBirth);
+      if (!dateOfBirth) {
+        throw new Error("Date of birth is invalid");
+      }
+
+      const response = await fetch(ENDPOINT_AUTH_REGISTER, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName: values.name,
+          dateOfBirth: dateOfBirth.format("YYYY-MM-DD"),
+          password: values.password,
+          username: values.username,
           email: values.email,
-        },
+          phoneNumber: values.phone,
+          role: "member",
+        }),
       });
+
+      if (!response.ok) {
+        throw new Error(`Registration failed with HTTP ${response.status}`);
+      }
+
       await login(values.username, values.password);
       message.success(t("website.auth.accountCreated"));
       navigate("/cabinet");
@@ -110,14 +122,6 @@ const SignUpPage: React.FC = () => {
             {t("website.nav.signUp", { defaultValue: "Sign up" })}
           </Title>
           <Text type="secondary">{t("website.auth.signUpSubtitle")}</Text>
-          {inviteCodeFromLink && (
-            <Alert
-              className="mt-4"
-              type="info"
-              showIcon
-              message={t("website.auth.inviteLinkDetected")}
-            />
-          )}
 
           <Form<SignUpValues> layout="vertical" className="mt-6" onFinish={handleSubmit}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -167,29 +171,47 @@ const SignUpPage: React.FC = () => {
                 <Input.Password autoComplete="new-password" />
               </Form.Item>
 
-              <Form.Item name="school" label={t("website.auth.school")}>
-                <Input />
+              <Form.Item
+                name="dateOfBirth"
+                label={t("website.auth.dateOfBirth")}
+                normalize={(value: string) => formatDateInput(value)}
+                rules={[
+                  { required: true, message: t("website.auth.dateOfBirthRequired") },
+                  {
+                    validator: (_, value: string) => {
+                      if (!value) return Promise.resolve();
+                      if (parseDateString(value)) return Promise.resolve();
+                      return Promise.reject(
+                        new Error(
+                          t("website.apply.form.validation.memberDobInvalid", {
+                            defaultValue: "Invalid date format (use DD.MM.YYYY)",
+                          })
+                        )
+                      );
+                    },
+                  },
+                ]}
+              >
+                <Input placeholder="DD.MM.YYYY" maxLength={10} autoComplete="bday" />
               </Form.Item>
-              <Form.Item name="grade" label={t("website.auth.grade")}>
-                <Input />
-              </Form.Item>
-              <Form.Item name="phone" label={t("website.auth.phone")}>
+              <Form.Item
+                name="phone"
+                label={t("website.auth.phone")}
+                rules={[{ required: true, message: t("website.auth.phoneRequired") }]}
+              >
                 <Input />
               </Form.Item>
               <Form.Item
                 name="email"
                 label={t("website.auth.email")}
-                rules={[{ type: "email", message: t("website.auth.emailInvalid") }]}
+                rules={[
+                  { required: true, message: t("website.auth.emailRequired") },
+                  { type: "email", message: t("website.auth.emailInvalid") },
+                ]}
               >
                 <Input autoComplete="email" />
               </Form.Item>
             </div>
-
-            {!inviteCodeFromLink && (
-              <Form.Item name="teamId" label={t("website.auth.joinTeamOptional")}>
-                <Select allowClear options={teamOptions} />
-              </Form.Item>
-            )}
 
             <div className="flex items-center justify-between gap-3">
               <Link to="/signin" className="text-[#0A306D] hover:underline">

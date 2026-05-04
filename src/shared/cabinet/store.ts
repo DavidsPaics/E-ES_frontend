@@ -7,6 +7,7 @@ export type UserRole =
 
 export interface UserProfile {
   name: string;
+  dateOfBirth?: string;
   school: string;
   grade: string;
   phone: string;

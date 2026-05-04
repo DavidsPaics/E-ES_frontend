@@ -87,12 +87,7 @@ const LiveDataPage: React.FC = () => {
     let ws: WebSocket | null = null;
 
     const connect = () => {
-      const token = localStorage.getItem("token");
-      const wsUrl = token
-        ? `${ENDPOINT_WS_LIVE}?token=${encodeURIComponent(token)}`
-        : ENDPOINT_WS_LIVE;
-
-      ws = new WebSocket(wsUrl);
+      ws = new WebSocket(ENDPOINT_WS_LIVE);
       wsRef.current = ws;
 
       ws.onopen = () => {
