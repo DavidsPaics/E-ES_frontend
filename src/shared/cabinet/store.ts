@@ -1,6 +1,8 @@
 export type UserRole =
   | "participant"
   | "team_leader"
+  | "pilot"
+  | "reserve_pilot"
   | "supervisor"
   | "admin"
   | "super_admin";

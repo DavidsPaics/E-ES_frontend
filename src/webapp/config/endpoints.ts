@@ -16,6 +16,7 @@ export const ENDPOINT_AUTH_REGISTER = `${BASE_URL}/api/register`;
 // User endpoints
 export const ENDPOINT_USERS = `${BASE_URL}/api/users`;
 export const ENDPOINT_ACCOUNTS = `${BASE_URL}/api/accounts`;
+export const ENDPOINT_ACCOUNT = `${BASE_URL}/api/account`;
 export const ENDPOINT_ACCOUNT_APPLICATIONS = `${BASE_URL}/api/account-applications`;
 export const ENDPOINT_ACCOUNT_VERIFICATION_INFO = `${BASE_URL}/api/account-verification-info`;
 export const ENDPOINT_VERIFY_ACCOUNT_APPLICATION = `${BASE_URL}/api/verify-account-application`;
@@ -48,7 +49,10 @@ export const ENDPOINT_ADMIN_SETTINGS = `${BASE_URL}/api/settings`;
 export const ENDPOINT_ADMIN_DELETE = `${BASE_URL}/api/delete`;
 
 // Applications endpoint (public — used by website)
-export const ENDPOINT_APPLICATIONS = `${BASE_URL}/api/applications`;
+export const ENDPOINT_TEAMS = `${BASE_URL}/api/teams`;
+export const ENDPOINT_TEAM_APPLICATION = `${BASE_URL}/api/team-application`;
+export const ENDPOINT_TEAM_APPLICATION_UPDATE = `${BASE_URL}/api/team`;
+export const ENDPOINT_APPLICATIONS = ENDPOINT_TEAMS;
 
 // News endpoints (public website + admin CRUD)
 export const ENDPOINT_NEWS = `${BASE_URL}/api/news`;
@@ -62,5 +66,5 @@ export const ENDPOINT_WS_LIVE = `${BASE_URL.replace(/^http/, "ws")}/ws`;
 // MapTiler API key and endpoint
 export const MAPTILER_KEY = env.VITE_MAPTILER_KEY ?? "";
 export const MAPTILER_TILE_URL = MAPTILER_KEY
-  ? `https://api.maptiler.com/maps/streets-v2/256/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`
+  ? `https://api.maptiler.com/maps/openstreetmap/256/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`
   : "";

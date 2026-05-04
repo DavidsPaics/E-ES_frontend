@@ -43,7 +43,7 @@ import {
   meetsMinTeamSize,
   isAgeValidForGroup,
 } from "../types/registration";
-import { ENDPOINT_APPLICATIONS } from "@/webapp/config/endpoints";
+import { ENDPOINT_TEAM_APPLICATION } from "@/webapp/config/endpoints";
 
 const { TextArea } = Input;
 const { Title, Text } = Typography;
@@ -414,7 +414,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSuccess, onCancel
     };
 
     try {
-      const response = await fetch(ENDPOINT_APPLICATIONS, {
+      const response = await fetch(ENDPOINT_TEAM_APPLICATION, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),

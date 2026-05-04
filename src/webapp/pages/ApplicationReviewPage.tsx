@@ -21,7 +21,7 @@ import {
 } from "@ant-design/icons";
 import "@ant-design/v5-patch-for-react-19";
 import { useTranslation } from "react-i18next";
-import { ENDPOINT_APPLICATIONS } from "@/webapp/config/endpoints";
+import { ENDPOINT_TEAM_APPLICATION_UPDATE, ENDPOINT_TEAMS } from "@/webapp/config/endpoints";
 import { apiFetch } from "@/webapp/utils/api";
 import { formatDisplayDate, formatDisplayTime } from "@/utils/dateFormat";
 
@@ -71,6 +71,7 @@ function firstNonEmpty(values: Array<unknown>, fallback = "-"): string {
 
 function normalizeStatus(value: unknown): ApplicationStatus {
   if (value === "accepted" || value === "denied" || value === "in_process") return value;
+  if (value === "pending") return "in_process";
   return "in_process";
 }
 
@@ -130,8 +131,11 @@ function normalizeApplication(rawValue: unknown, index: number): ApplicationReco
   );
 
   return {
-    id: String(rawValue.id ?? rawValue._id ?? `application-${index}`),
-    teamName: firstNonEmpty([rawValue.teamName, rawValue.team, rawValue.name], "Unnamed team"),
+    id: String(rawValue.key ?? rawValue.id ?? rawValue._id ?? `application-${index}`),
+    teamName: firstNonEmpty(
+      [rawValue.teamName, rawValue.komandasNosaukums, rawValue.team, rawValue.name],
+      "Unnamed team"
+    ),
     school: firstNonEmpty([rawValue.school, rawValue.institution, rawValue.educationalInstitution]),
     supervisor: firstNonEmpty([
       rawValue.supervisor,
@@ -380,7 +384,7 @@ const ApplicationReviewPage: React.FC = () => {
   const fetchApplications = async () => {
     setLoading(true);
     try {
-      const response = await apiFetch(ENDPOINT_APPLICATIONS);
+      const response = await apiFetch(ENDPOINT_TEAMS);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
       const payload: unknown = await response.json();
@@ -390,7 +394,9 @@ const ApplicationReviewPage: React.FC = () => {
           ? payload.data
           : isRecord(payload) && Array.isArray(payload.applications)
             ? payload.applications
-            : [];
+            : isRecord(payload) && Array.isArray(payload.teams)
+              ? payload.teams
+              : [];
 
       const normalized = items
         .map((entry, index) => normalizeApplication(entry, index))
@@ -433,17 +439,21 @@ const ApplicationReviewPage: React.FC = () => {
   }, [applications, search, statusFilter]);
 
   const persistStatus = async (record: ApplicationRecord, status: ApplicationStatus) => {
+    const apiStatus = status === "in_process" ? "pending" : status;
     const payload = JSON.stringify({
-      id: record.id,
-      status,
+      key: record.id,
+      status: apiStatus,
       teamName: record.teamName,
       appliedAt: record.appliedAtRaw,
     });
 
-    const methods: Array<"PATCH" | "PUT"> = ["PATCH", "PUT"];
-    for (const method of methods) {
-      const response = await apiFetch(`${ENDPOINT_APPLICATIONS}/${encodeURIComponent(record.id)}`, {
-        method,
+    const requests: Array<{ url: string; method: "PATCH" | "POST" }> = [
+      { url: ENDPOINT_TEAM_APPLICATION_UPDATE, method: "PATCH" },
+      { url: `${ENDPOINT_TEAM_APPLICATION_UPDATE}/${encodeURIComponent(record.id)}`, method: "POST" },
+    ];
+    for (const request of requests) {
+      const response = await apiFetch(request.url, {
+        method: request.method,
         headers: { "Content-Type": "application/json" },
         body: payload,
       });

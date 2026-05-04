@@ -19,7 +19,7 @@ import {
   WarningOutlined,
 } from "@ant-design/icons";
 import "@ant-design/v5-patch-for-react-19";
-import { ENDPOINT_APPLICATIONS } from "@/webapp/config/endpoints";
+import { ENDPOINT_TEAMS } from "@/webapp/config/endpoints";
 import RegistrationForm from "../components/RegistrationForm";
 import { formatDisplayDate } from "@/utils/dateFormat";
 import { type VehicleDocument } from "@/shared/cabinet/store";
@@ -77,6 +77,7 @@ function toTeamId(teamName: string, fallback: string): string {
 
 function normalizeStatus(value: unknown): ApplicationStatus {
   if (value === "accepted" || value === "denied" || value === "in_process") return value;
+  if (value === "pending") return "in_process";
   return "in_process";
 }
 
@@ -108,10 +109,14 @@ function normalizeMembers(rawMembers: unknown, teamId: string): ApplicantMember[
 function normalizeApplicant(value: unknown, index: number): Applicant | null {
   if (!isRecord(value)) return null;
 
-  const teamName = firstNonEmpty([value.teamName, value.team, value.name], `Team ${index + 1}`);
+  const teamName = firstNonEmpty(
+    [value.teamName, value.komandasNosaukums, value.team, value.name],
+    `Team ${index + 1}`
+  );
   const teamId = firstNonEmpty(
     [
       value.teamId,
+      value.key,
       isRecord(value.team) ? value.team.id : undefined,
       isRecord(value.team) ? value.team.key : undefined,
     ],
@@ -134,7 +139,7 @@ function normalizeApplicant(value: unknown, index: number): Applicant | null {
   }
 
   return {
-    id: firstNonEmpty([value.id, value._id], `application-${index + 1}`),
+    id: firstNonEmpty([value.key, value.id, value._id], `application-${index + 1}`),
     teamId,
     teamName,
     school: firstNonEmpty([value.school, value.institution, value.educationalInstitution], "-"),
@@ -205,7 +210,7 @@ const ApplicationPage: React.FC = () => {
   const fetchApplicants = () => {
     setLoading(true);
 
-    fetch(ENDPOINT_APPLICATIONS)
+    fetch(ENDPOINT_TEAMS)
       .then((res) => {
         if (!res.ok) throw new Error("Server error");
         return res.json();
@@ -217,7 +222,9 @@ const ApplicationPage: React.FC = () => {
             ? payload.data
             : isRecord(payload) && Array.isArray(payload.applications)
               ? payload.applications
-              : [];
+              : isRecord(payload) && Array.isArray(payload.teams)
+                ? payload.teams
+                : [];
 
         const normalized = rawItems
           .map((item, index) => normalizeApplicant(item, index))

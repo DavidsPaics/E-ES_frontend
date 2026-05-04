@@ -1,15 +1,23 @@
-import React from "react";
-import { Button, Card, Form, Input, Typography, message } from "antd";
+import React, { useEffect, useMemo, useState } from "react";
+import { Button, Card, Form, Input, Select, Typography, message } from "antd";
 import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/webapp/authentification/AuthContext";
-import { ENDPOINT_AUTH_REGISTER } from "@/webapp/config/endpoints";
+import { ENDPOINT_AUTH_REGISTER, ENDPOINT_TEAMS } from "@/webapp/config/endpoints";
+import { getAllTeams } from "@/shared/cabinet/store";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 
 dayjs.extend(customParseFormat);
 
 const { Title, Text } = Typography;
+
+type AccountTeamRole = "participant" | "team_leader" | "pilot" | "reserve_pilot";
+
+interface SelectableTeam {
+  id: string;
+  name: string;
+}
 
 interface SignUpValues {
   username: string;
@@ -19,6 +27,8 @@ interface SignUpValues {
   dateOfBirth: string;
   phone: string;
   email: string;
+  teamId?: string;
+  teamRole?: AccountTeamRole;
 }
 
 const formatDateInput = (input: string): string => {
@@ -36,10 +46,91 @@ const parseDateString = (input: string) => {
   return parsed.isValid() && !parsed.isAfter(dayjs(), "day") ? parsed : null;
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function firstNonEmpty(values: unknown[], fallback = ""): string {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number") return String(value);
+  }
+  return fallback;
+}
+
+function normalizeTeam(value: unknown, index: number): SelectableTeam | null {
+  if (!isRecord(value)) return null;
+  const name = firstNonEmpty([value.teamName, value.komandasNosaukums, value.name], "");
+  if (!name) return null;
+  return {
+    id: firstNonEmpty([value.key, value.id, value.teamId], name || `team-${index + 1}`),
+    name,
+  };
+}
+
+function getLocalTeams(): SelectableTeam[] {
+  return getAllTeams()
+    .map((team) => ({ id: team.id, name: team.name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 const SignUpPage: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { login, isAuthenticated } = useAuth();
+  const [form] = Form.useForm<SignUpValues>();
+  const selectedTeamId = Form.useWatch("teamId", form);
+  const [teams, setTeams] = useState<SelectableTeam[]>(() => getLocalTeams());
+  const [teamsLoading, setTeamsLoading] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    setTeamsLoading(true);
+
+    fetch(ENDPOINT_TEAMS)
+      .then((response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json() as Promise<unknown>;
+      })
+      .then((payload) => {
+        const rawTeams = Array.isArray(payload)
+          ? payload
+          : isRecord(payload) && Array.isArray(payload.teams)
+            ? payload.teams
+            : isRecord(payload) && Array.isArray(payload.data)
+              ? payload.data
+              : [];
+        const normalized = rawTeams
+          .map((item, index) => normalizeTeam(item, index))
+          .filter((item): item is SelectableTeam => item !== null)
+          .sort((a, b) => a.name.localeCompare(b.name));
+        if (active && normalized.length > 0) {
+          setTeams(normalized);
+        }
+      })
+      .catch(() => {
+        if (active) setTeams(getLocalTeams());
+      })
+      .finally(() => {
+        if (active) setTeamsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const teamOptions = useMemo(
+    () => teams.map((team) => ({ value: team.id, label: team.name })),
+    [teams]
+  );
+
+  const teamRoleOptions: { value: AccountTeamRole; label: string }[] = [
+    { value: "participant", label: t("website.apply.form.roleParticipant") },
+    { value: "team_leader", label: t("website.apply.form.roleTeamLeader") },
+    { value: "pilot", label: t("website.apply.form.rolePilot") },
+    { value: "reserve_pilot", label: t("website.apply.form.roleReservePilot") },
+  ];
 
   const getLocalizedSignUpError = (error: unknown): string => {
     if (!(error instanceof Error)) return t("website.auth.signUpFailed");
@@ -71,17 +162,28 @@ const SignUpPage: React.FC = () => {
         throw new Error("Date of birth is invalid");
       }
 
+      const selectedTeam = values.teamId
+        ? teams.find((team) => team.id === values.teamId)
+        : undefined;
+
+      if (values.teamId && !selectedTeam) {
+        throw new Error("Team not found");
+      }
+
+      const role = values.teamId ? values.teamRole ?? "participant" : "member";
+
       const response = await fetch(ENDPOINT_AUTH_REGISTER, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           fullName: values.name,
           dateOfBirth: dateOfBirth.format("YYYY-MM-DD"),
-          password: values.password,
-          username: values.username,
-          email: values.email,
-          phoneNumber: values.phone,
-          role: "member",
+          parole: values.password,
+          lietotajvards: values.username,
+          epasts: values.email,
+          telefonanumurs: values.phone,
+          komandasNosaukums: selectedTeam?.name ?? "",
+          role,
         }),
       });
 
@@ -123,7 +225,13 @@ const SignUpPage: React.FC = () => {
           </Title>
           <Text type="secondary">{t("website.auth.signUpSubtitle")}</Text>
 
-          <Form<SignUpValues> layout="vertical" className="mt-6" onFinish={handleSubmit}>
+          <Form<SignUpValues>
+            form={form}
+            layout="vertical"
+            className="mt-6"
+            initialValues={{ teamRole: "participant" }}
+            onFinish={handleSubmit}
+          >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Form.Item
                 name="username"
@@ -211,6 +319,27 @@ const SignUpPage: React.FC = () => {
               >
                 <Input autoComplete="email" />
               </Form.Item>
+
+              <Form.Item name="teamId" label={t("website.auth.joinTeamOptional")}>
+                <Select
+                  allowClear
+                  showSearch
+                  loading={teamsLoading}
+                  optionFilterProp="label"
+                  placeholder={t("website.auth.joinTeamOptional")}
+                  options={teamOptions}
+                />
+              </Form.Item>
+
+              {selectedTeamId && (
+                <Form.Item
+                  name="teamRole"
+                  label={t("website.apply.form.memberRole")}
+                  rules={[{ required: true, message: t("website.apply.form.validation.memberRoleRequired") }]}
+                >
+                  <Select options={teamRoleOptions} />
+                </Form.Item>
+              )}
             </div>
 
             <div className="flex items-center justify-between gap-3">

@@ -3,6 +3,7 @@ import {
   Alert,
   Button,
   Card,
+  Descriptions,
   Form,
   Image,
   Input,
@@ -15,7 +16,6 @@ import {
   message,
 } from "antd";
 import {
-  CopyOutlined,
   DeleteOutlined,
   SaveOutlined,
   TeamOutlined,
@@ -23,39 +23,41 @@ import {
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/webapp/authentification/AuthContext";
+import { storeAuthUser } from "@/webapp/authentification/credentials";
+import { ENDPOINT_ACCOUNT, ENDPOINT_ACCOUNTS, ENDPOINT_TEAMS } from "@/webapp/config/endpoints";
+import { apiFetch } from "@/webapp/utils/api";
 import {
-  createTeamInvite,
   deleteTeam,
   deleteUser,
   getAllTeams,
-  getTeamInvites,
   getAllUsers,
-  getTeamById,
   getUsersByTeam,
   kickTeamMember,
   removeUserFromTeam,
-  revokeTeamInvite,
   type PublicUserRecord,
   type TeamRecord,
-  type TeamInviteRecord,
   type UserRole,
   type VehicleDocument,
   updateTeam,
   updateUser,
 } from "@/shared/cabinet/store";
 import { formatDisplayDate } from "@/utils/dateFormat";
+import dayjs from "dayjs";
+import customParseFormat from "dayjs/plugin/customParseFormat";
+
+dayjs.extend(customParseFormat);
 
 const { Text, Title } = Typography;
 
 interface ProfileFormValues {
   username: string;
   name: string;
+  dateOfBirth: string;
   school: string;
   grade: string;
   phone: string;
   email: string;
   profilePicture: string;
-  aboutMe: string;
 }
 
 interface TeamFormValues {
@@ -70,12 +72,371 @@ interface AdminUserFormValues extends ProfileFormValues {
   teamId?: string;
 }
 
+interface TeamModerationMember {
+  key: string;
+  fullName: string;
+  role?: string;
+  dateOfBirth?: string;
+  educationalInstitution?: string;
+  phone?: string;
+  email?: string;
+  classOrYear?: string;
+}
+
+interface TeamModerationRecord extends TeamRecord {
+  ageGroup?: string;
+  institution?: string;
+  cityOrRegion?: string;
+  status?: string;
+  appliedAt?: string;
+  responsiblePerson?: {
+    fullName?: string;
+    phone?: string;
+    email?: string;
+    status?: string;
+  };
+  comments?: string;
+  howHeardAbout?: string;
+  members: TeamModerationMember[];
+}
+
+const DATE_INPUT_FORMAT = "DD.MM.YYYY";
+
+function formatDateInput(input: string): string {
+  const digits = input.replace(/\D/g, "");
+  if (digits.length === 0) return "";
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}.${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}.${digits.slice(2, 4)}.${digits.slice(4, 8)}`;
+}
+
+function parseDateString(input: string) {
+  const formatted = formatDateInput(input);
+  if (formatted.length < 10) return null;
+  const parsed = dayjs(formatted, DATE_INPUT_FORMAT, true);
+  return parsed.isValid() && !parsed.isAfter(dayjs(), "day") ? parsed : null;
+}
+
+function formatDateForInput(value?: string): string {
+  if (!value) return "";
+
+  const isoDate = dayjs(value, "YYYY-MM-DD", true);
+  if (isoDate.isValid()) return isoDate.format(DATE_INPUT_FORMAT);
+
+  const displayDate = dayjs(value, DATE_INPUT_FORMAT, true);
+  if (displayDate.isValid()) return displayDate.format(DATE_INPUT_FORMAT);
+
+  const looseDate = dayjs(value);
+  return looseDate.isValid() ? looseDate.format(DATE_INPUT_FORMAT) : "";
+}
+
+function getApiDateOfBirth(values: ProfileFormValues, fallback?: string): string {
+  const parsed = parseDateString(values.dateOfBirth || "");
+  if (parsed) return parsed.format("YYYY-MM-DD");
+  return fallback || "";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function firstString(values: unknown[], fallback = ""): string {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number") return String(value);
+  }
+  return fallback;
+}
+
+function normalizeUserRole(value: unknown): UserRole {
+  if (
+    value === "participant" ||
+    value === "team_leader" ||
+    value === "pilot" ||
+    value === "reserve_pilot" ||
+    value === "supervisor" ||
+    value === "admin" ||
+    value === "super_admin"
+  ) {
+    return value;
+  }
+  if (value === "member") return "participant";
+  return "participant";
+}
+
+function normalizeAccountInfo(value: unknown, index: number): PublicUserRecord | null {
+  if (!isRecord(value)) return null;
+
+  const data = isRecord(value.dati)
+    ? value.dati
+    : isRecord(value.cilveks)
+      ? value.cilveks
+      : isRecord(value.profile)
+        ? value.profile
+        : value;
+  const username = firstString(
+    [value.lietotajvards, value.username, value.login, value.epasts, value.email],
+    `account-${index + 1}`
+  );
+  const accountId = firstString(
+    [value.key, value.id, value.ID, value.accountId, data.key, data.userId],
+    username
+  );
+  const role = normalizeUserRole(data.role ?? value.role ?? value.type);
+
+  return {
+    id: accountId,
+    username,
+    role,
+    teamId: firstString([value.teamId, value.team_id, value.komandasId, data.teamId, data.ID, data.id], "") || undefined,
+    profile: {
+      name: firstString([data.fullName, data.name, data.full_name], username),
+      dateOfBirth: firstString([data.dateOfBirth, data.dzimsanasDatums], "") || undefined,
+      school: firstString([data.educationalInstitution, data.school], ""),
+      grade: firstString([data.classOrYear, data.grade], ""),
+      phone: firstString([value.telefonanumurs, value.phoneNumber, data.phone, data.phoneNumber], ""),
+      email: firstString([value.epasts, value.email, data.email], ""),
+      profilePicture: firstString([data.profilePicture, data.avatar], ""),
+      aboutMe: firstString([data.aboutMe, data.bio], ""),
+    },
+  };
+}
+
+function toTeamModerationId(name: string, fallback: string): string {
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || fallback;
+}
+
+function normalizeTeamMember(value: unknown, index: number, teamId: string): TeamModerationMember | null {
+  if (!isRecord(value)) return null;
+
+  const fullName = firstString([value.fullName, value.vardsUzvards, value.pilnsVards, value.name, value.full_name], "");
+  if (!fullName) return null;
+
+  return {
+    key: firstString([value.key, value.id, value.ID, value.userId], `${teamId}-member-${index + 1}`),
+    fullName,
+    role: firstString([value.role, value.loma], "") || undefined,
+    dateOfBirth: firstString([value.dateOfBirth, value.dzimsanasDatums], "") || undefined,
+    educationalInstitution: firstString(
+      [value.educationalInstitution, value.izglitibasIestade, value.school],
+      ""
+    ) || undefined,
+    phone: firstString([value.phone, value.phoneNumber, value.telefonanumurs, value.talrunis], "") || undefined,
+    email: firstString([value.email, value.epasts], "") || undefined,
+    classOrYear: firstString([value.classOrYear, value.klaseVaiKurss, value.grade], "") || undefined,
+  };
+}
+
+function normalizeVehicleDocuments(value: unknown, teamId: string): VehicleDocument[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .filter((item): item is Record<string, unknown> => isRecord(item))
+    .map((item, index) => ({
+      id: firstString([item.id], `${teamId}-document-${index + 1}`),
+      name: firstString([item.name], `Document ${index + 1}`),
+      type: firstString([item.type], ""),
+      dataUrl: firstString([item.dataUrl, item.url], ""),
+      uploadedAt: firstString([item.uploadedAt], ""),
+    }));
+}
+
+function normalizeTeamApplication(value: unknown, index: number): TeamModerationRecord | null {
+  if (!isRecord(value)) return null;
+
+  const name = firstString(
+    [value.teamName, value.komandasNosaukums, value.name],
+    `Team ${index + 1}`
+  );
+  const id = firstString(
+    [value.key, value.id, value.ID, value.teamId],
+    toTeamModerationId(name, `team-${index + 1}`)
+  );
+  const rawMembers = Array.isArray(value.members)
+    ? value.members
+    : Array.isArray(value.dalibnieki)
+      ? value.dalibnieki
+      : Array.isArray(value.cilveki)
+        ? value.cilveki
+        : [];
+  const members = rawMembers
+    .map((member, memberIndex) => normalizeTeamMember(member, memberIndex, id))
+    .filter((member): member is TeamModerationMember => member !== null);
+  const rawResponsiblePerson = isRecord(value.responsiblePerson)
+    ? value.responsiblePerson
+    : isRecord(value.atbildigaPersona)
+      ? value.atbildigaPersona
+      : undefined;
+  const responsiblePerson = rawResponsiblePerson
+    ? {
+        fullName: firstString([rawResponsiblePerson.fullName, rawResponsiblePerson.vardsUzvards, rawResponsiblePerson.name], "") || undefined,
+        phone: firstString(
+          [rawResponsiblePerson.phone, rawResponsiblePerson.phoneNumber, rawResponsiblePerson.telefonanumurs, rawResponsiblePerson.talrunis],
+          ""
+        ) || undefined,
+        email: firstString([rawResponsiblePerson.email, rawResponsiblePerson.epasts], "") || undefined,
+        status: firstString([rawResponsiblePerson.status, rawResponsiblePerson.statuss], "") || undefined,
+      }
+    : undefined;
+
+  return {
+    id,
+    name,
+    description: firstString([value.description, value.teamDescription], ""),
+    profilePicture: firstString([value.profilePicture, value.teamProfilePicture], ""),
+    vehicleDescription: firstString([value.vehicleDescription], ""),
+    vehiclePictures: Array.isArray(value.vehiclePictures)
+      ? value.vehiclePictures.filter((item): item is string => typeof item === "string")
+      : [],
+    vehicleDocuments: normalizeVehicleDocuments(value.vehicleDocuments, id),
+    memberIds: members.map((member) => member.key),
+    members,
+    ageGroup: firstString([value.ageGroup, value.vecumaGrupa], "") || undefined,
+    institution: firstString([value.institution, value.iestade, value.school, value.educationalInstitution], "") || undefined,
+    cityOrRegion: firstString([value.cityOrRegion, value.pilsetaVaiNovads], "") || undefined,
+    status: firstString([value.status, value.statuss], "") || undefined,
+    appliedAt: firstString([value.appliedAt, value.createdAt, value.submittedAt, value.date, value.pieteikts], "") || undefined,
+    responsiblePerson,
+    comments: firstString([value.comments, value.komentari], "") || undefined,
+    howHeardAbout: firstString([value.howHeardAbout, value.kaUzzinaja], "") || undefined,
+  };
+}
+
+function localTeamToModerationRecord(value: TeamRecord): TeamModerationRecord {
+  return {
+    ...value,
+    members: value.memberIds.map((memberId) => ({
+      key: memberId,
+      fullName: getUsersByTeam(value.id).find((user) => user.id === memberId)?.profile.name || memberId,
+    })),
+  };
+}
+
+function getTeamResponseItems(payload: unknown): unknown[] {
+  if (Array.isArray(payload)) return payload;
+  if (!isRecord(payload)) return [];
+
+  const nestedPayloads = [payload.teams, payload.komandas, payload.applications, payload.data, payload.team];
+  for (const nested of nestedPayloads) {
+    if (Array.isArray(nested)) return nested;
+    if (isRecord(nested)) return [nested];
+  }
+
+  if (
+    typeof payload.teamName === "string" ||
+    typeof payload.komandasNosaukums === "string" ||
+    Array.isArray(payload.members) ||
+    Array.isArray(payload.dalibnieki)
+  ) {
+    return [payload];
+  }
+
+  return [];
+}
+
+function teamRoleLabel(role?: string): string {
+  switch (role) {
+    case "member":
+    case "participant":
+      return "Participant";
+    case "team_leader":
+      return "Team Leader";
+    case "pilot":
+      return "Pilot";
+    case "reserve_pilot":
+      return "Reserve Pilot";
+    case "supervisor":
+      return "Supervisor";
+    default:
+      return role || "-";
+  }
+}
+
+function buildAccountPayload(
+  user: PublicUserRecord,
+  values: ProfileFormValues,
+  role: UserRole = user.role,
+  teamId: string | undefined = user.teamId
+) {
+  const profilePicture = (values.profilePicture || "").trim();
+  const dateOfBirth = getApiDateOfBirth(values, user.profile.dateOfBirth);
+
+  return {
+    key: user.id,
+    lietotajvards: values.username.trim(),
+    epasts: values.email.trim(),
+    telefonanumurs: values.phone.trim(),
+    teamId,
+    komandasId: teamId,
+    role,
+    dati: {
+      key: user.id,
+      id: teamId || "",
+      fullName: values.name.trim(),
+      dateOfBirth,
+      educationalInstitution: values.school.trim(),
+      role,
+      classOrYear: values.grade.trim(),
+      profilePicture,
+    },
+  };
+}
+
+function buildUpdatedUser(
+  user: PublicUserRecord,
+  values: ProfileFormValues,
+  role: UserRole = user.role,
+  teamId: string | undefined = user.teamId
+): PublicUserRecord {
+  return {
+    ...user,
+    username: values.username.trim(),
+    role,
+    teamId,
+    profile: {
+      ...user.profile,
+      name: values.name.trim(),
+      dateOfBirth: getApiDateOfBirth(values, user.profile.dateOfBirth) || undefined,
+      school: values.school.trim(),
+      grade: values.grade.trim(),
+      phone: values.phone.trim(),
+      email: values.email.trim(),
+      profilePicture: (values.profilePicture || "").trim(),
+    },
+  };
+}
+
+async function saveAccountProfileToApi(
+  user: PublicUserRecord,
+  values: ProfileFormValues,
+  role: UserRole = user.role,
+  teamId: string | undefined = user.teamId
+) {
+  const response = await apiFetch(`${ENDPOINT_ACCOUNT}/${encodeURIComponent(user.id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(buildAccountPayload(user, values, role, teamId)),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Profile update failed with HTTP ${response.status}`);
+  }
+}
+
 function roleLabel(role: UserRole): string {
   switch (role) {
     case "participant":
       return "Participant";
     case "team_leader":
       return "Team Leader";
+    case "pilot":
+      return "Pilot";
+    case "reserve_pilot":
+      return "Reserve Pilot";
     case "supervisor":
       return "Supervisor";
     case "admin":
@@ -97,6 +458,10 @@ function roleColor(role: UserRole): string {
       return "cyan";
     case "team_leader":
       return "gold";
+    case "pilot":
+      return "blue";
+    case "reserve_pilot":
+      return "orange";
     default:
       return "default";
   }
@@ -132,30 +497,29 @@ const CabinetPage: React.FC = () => {
   const navigate = useNavigate();
   const { currentUser, refreshCurrentUser, logout } = useAuth();
   const [profileForm] = Form.useForm<ProfileFormValues>();
-  const [teamForm] = Form.useForm<TeamFormValues>();
   const [adminUserForm] = Form.useForm<AdminUserFormValues>();
   const [adminTeamForm] = Form.useForm<TeamFormValues>();
   const watchedProfilePicture = Form.useWatch("profilePicture", profileForm);
-  const watchedTeamProfilePicture = Form.useWatch("profilePicture", teamForm);
   const watchedAdminUserProfilePicture = Form.useWatch("profilePicture", adminUserForm);
   const watchedAdminTeamProfilePicture = Form.useWatch("profilePicture", adminTeamForm);
 
-  const [team, setTeam] = useState<TeamRecord | null>(null);
-  const [teamMembers, setTeamMembers] = useState<PublicUserRecord[]>([]);
-  const [teamPictures, setTeamPictures] = useState<string[]>([]);
-  const [teamDocuments, setTeamDocuments] = useState<VehicleDocument[]>([]);
-  const [teamInvites, setTeamInvites] = useState<TeamInviteRecord[]>([]);
-
   const [allUsers, setAllUsers] = useState<PublicUserRecord[]>([]);
-  const [allTeams, setAllTeams] = useState<TeamRecord[]>([]);
+  const [allTeams, setAllTeams] = useState<TeamModerationRecord[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [teamsLoading, setTeamsLoading] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
+  const [viewingTeam, setViewingTeam] = useState<TeamModerationRecord | null>(null);
   const [adminTeamPictures, setAdminTeamPictures] = useState<string[]>([]);
   const [adminTeamDocuments, setAdminTeamDocuments] = useState<VehicleDocument[]>([]);
   const [adminTeamMembers, setAdminTeamMembers] = useState<PublicUserRecord[]>([]);
 
   const canManageOwnTeam =
-    currentUser?.role === "team_leader" || currentUser?.role === "supervisor";
+    currentUser?.role === "participant" ||
+    currentUser?.role === "team_leader" ||
+    currentUser?.role === "pilot" ||
+    currentUser?.role === "reserve_pilot" ||
+    currentUser?.role === "supervisor";
   const isSuperAdmin = currentUser?.role === "super_admin";
 
   const allTeamOptions = useMemo(
@@ -167,45 +531,76 @@ const CabinetPage: React.FC = () => {
     [allTeams]
   );
 
+  const fetchModerationUsers = async () => {
+    setUsersLoading(true);
+    try {
+      const response = await apiFetch(ENDPOINT_ACCOUNTS);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const payload: unknown = await response.json();
+      const items = Array.isArray(payload)
+        ? payload
+        : isRecord(payload) && Array.isArray(payload.accounts)
+          ? payload.accounts
+          : isRecord(payload) && Array.isArray(payload.data)
+            ? payload.data
+            : [];
+
+      const users = items
+        .map((item, index) => normalizeAccountInfo(item, index))
+        .filter((item): item is PublicUserRecord => item !== null);
+
+      setAllUsers(users);
+    } catch (error) {
+      setAllUsers(getAllUsers());
+      message.warning("Could not load users from server. Showing local users.");
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  const fetchModerationTeams = async () => {
+    setTeamsLoading(true);
+    try {
+      const response = await apiFetch(ENDPOINT_TEAMS);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const payload: unknown = await response.json();
+      const items = getTeamResponseItems(payload);
+
+      const teams = items
+        .map((item, index) => normalizeTeamApplication(item, index))
+        .filter((item): item is TeamModerationRecord => item !== null);
+
+      setAllTeams(teams);
+    } catch (error) {
+      setAllTeams(getAllTeams().map(localTeamToModerationRecord));
+      message.warning("Could not load teams from server. Showing local teams.");
+    } finally {
+      setTeamsLoading(false);
+    }
+  };
+
   const refreshPageData = () => {
     if (!currentUser) return;
 
     profileForm.setFieldsValue({
       username: currentUser.username,
       name: currentUser.profile.name || "",
+      dateOfBirth: formatDateForInput(currentUser.profile.dateOfBirth),
       school: currentUser.profile.school || "",
       grade: currentUser.profile.grade || "",
       phone: currentUser.profile.phone || "",
       email: currentUser.profile.email || "",
       profilePicture: currentUser.profile.profilePicture || "",
-      aboutMe: currentUser.profile.aboutMe || "",
     });
 
-    if (currentUser.teamId) {
-      const teamData = getTeamById(currentUser.teamId);
-      setTeam(teamData);
-      setTeamMembers(getUsersByTeam(currentUser.teamId));
-      setTeamPictures(teamData?.vehiclePictures ?? []);
-      setTeamDocuments(teamData?.vehicleDocuments ?? []);
-      setTeamInvites(getTeamInvites(currentUser.teamId).filter((invite) => !invite.usedByUserId));
-      teamForm.setFieldsValue({
-        name: teamData?.name ?? "",
-        description: teamData?.description ?? "",
-        profilePicture: teamData?.profilePicture ?? "",
-        vehicleDescription: teamData?.vehicleDescription ?? "",
-      });
-    } else {
-      setTeam(null);
-      setTeamMembers([]);
-      setTeamPictures([]);
-      setTeamDocuments([]);
-      setTeamInvites([]);
-      teamForm.resetFields();
-    }
-
     if (isSuperAdmin) {
-      setAllUsers(getAllUsers());
-      setAllTeams(getAllTeams());
+      void fetchModerationUsers();
+      void fetchModerationTeams();
+    } else if (canManageOwnTeam) {
+      setAllUsers([]);
+      void fetchModerationTeams();
     } else {
       setAllUsers([]);
       setAllTeams([]);
@@ -220,18 +615,17 @@ const CabinetPage: React.FC = () => {
     if (!currentUser) return;
     try {
       const values = await profileForm.validateFields();
-      updateUser(currentUser.id, {
-        username: values.username.trim(),
-        profile: {
-          name: values.name.trim(),
-          school: values.school.trim(),
-          grade: values.grade.trim(),
-          phone: values.phone.trim(),
-          email: values.email.trim(),
-          profilePicture: (values.profilePicture || "").trim(),
-          aboutMe: values.aboutMe.trim(),
-        },
-      });
+      await saveAccountProfileToApi(currentUser, values);
+      const updatedUser = buildUpdatedUser(currentUser, values);
+
+      if (getAllUsers().some((user) => user.id === currentUser.id)) {
+        updateUser(currentUser.id, {
+          username: updatedUser.username,
+          profile: updatedUser.profile,
+        });
+      }
+
+      storeAuthUser(updatedUser);
       refreshCurrentUser();
       message.success("Profile updated.");
     } catch (error) {
@@ -248,11 +642,6 @@ const CabinetPage: React.FC = () => {
       removeUserFromTeam(currentUser.id);
       refreshCurrentUser();
       message.success("You left the team.");
-      setTeam(null);
-      setTeamMembers([]);
-      setTeamPictures([]);
-      setTeamDocuments([]);
-      setTeamInvites([]);
     } catch (error) {
       const text = error instanceof Error ? error.message : "Failed to leave team.";
       message.error(text);
@@ -270,13 +659,11 @@ const CabinetPage: React.FC = () => {
 
   const handleAddTeamPictures = async (
     files: FileList | null,
-    target: "own" | "admin"
+    target: "admin"
   ) => {
     try {
       const images = await readFilesAsDataUrls(files);
-      if (target === "own") {
-        setTeamPictures((prev) => [...prev, ...images]);
-      } else {
+      if (target === "admin") {
         setAdminTeamPictures((prev) => [...prev, ...images]);
       }
     } catch {
@@ -286,7 +673,7 @@ const CabinetPage: React.FC = () => {
 
   const handleAddTeamDocuments = async (
     files: FileList | null,
-    target: "own" | "admin"
+    target: "admin"
   ) => {
     if (!files) return;
     try {
@@ -302,98 +689,11 @@ const CabinetPage: React.FC = () => {
         });
       }
 
-      if (target === "own") {
-        setTeamDocuments((prev) => [...prev, ...docs]);
-      } else {
+      if (target === "admin") {
         setAdminTeamDocuments((prev) => [...prev, ...docs]);
       }
     } catch {
       message.error("Failed to read document files.");
-    }
-  };
-
-  const handleSaveOwnTeam = async () => {
-    if (!team) return;
-    try {
-      const values = await teamForm.validateFields();
-      const updated = updateTeam(team.id, {
-        name: values.name.trim(),
-        description: values.description.trim(),
-        profilePicture: (values.profilePicture || "").trim(),
-        vehicleDescription: values.vehicleDescription.trim(),
-        vehiclePictures: teamPictures,
-        vehicleDocuments: teamDocuments,
-      });
-      setTeam(updated);
-      message.success("Team information updated.");
-      refreshCurrentUser();
-      refreshPageData();
-    } catch (error) {
-      const text = error instanceof Error ? error.message : "Failed to update team.";
-      message.error(text);
-    }
-  };
-
-  const handleDeleteOwnTeam = () => {
-    if (!team) return;
-    if (!window.confirm("Delete this team and detach all members?")) return;
-
-    deleteTeam(team.id);
-    refreshCurrentUser();
-    message.success("Team deleted.");
-    setTeam(null);
-    setTeamMembers([]);
-    setTeamPictures([]);
-    setTeamDocuments([]);
-    setTeamInvites([]);
-  };
-
-  const handleKickOwnTeamMember = (memberId: string) => {
-    if (!team) return;
-    if (!window.confirm("Kick this member from the team?")) return;
-
-    kickTeamMember(team.id, memberId);
-    refreshPageData();
-    message.success("Member removed from team.");
-  };
-
-  const getInviteLink = (code: string) => {
-    const url = new URL("/signup", window.location.origin);
-    url.searchParams.set("invite", code);
-    return url.toString();
-  };
-
-  const handleCreateTeamInvite = async () => {
-    if (!team || !currentUser) return;
-    try {
-      const invite = createTeamInvite(team.id, currentUser.id);
-      setTeamInvites(getTeamInvites(team.id).filter((item) => !item.usedByUserId));
-      await navigator.clipboard.writeText(getInviteLink(invite.code));
-      message.success("Invitation link copied.");
-    } catch (error) {
-      const text = error instanceof Error ? error.message : "Failed to create invite.";
-      message.error(text);
-    }
-  };
-
-  const handleCopyInviteLink = async (code: string) => {
-    try {
-      await navigator.clipboard.writeText(getInviteLink(code));
-      message.success("Invitation link copied.");
-    } catch {
-      message.error("Failed to copy invitation link.");
-    }
-  };
-
-  const handleRevokeTeamInvite = (inviteId: string) => {
-    if (!team || !currentUser) return;
-    try {
-      revokeTeamInvite(inviteId, currentUser.id);
-      setTeamInvites(getTeamInvites(team.id).filter((item) => !item.usedByUserId));
-      message.success("Invite revoked.");
-    } catch (error) {
-      const text = error instanceof Error ? error.message : "Failed to revoke invite.";
-      message.error(text);
     }
   };
 
@@ -404,12 +704,12 @@ const CabinetPage: React.FC = () => {
       role: user.role,
       teamId: user.teamId,
       name: user.profile.name || "",
+      dateOfBirth: formatDateForInput(user.profile.dateOfBirth),
       school: user.profile.school || "",
       grade: user.profile.grade || "",
       phone: user.profile.phone || "",
       email: user.profile.email || "",
       profilePicture: user.profile.profilePicture || "",
-      aboutMe: user.profile.aboutMe || "",
     });
   };
 
@@ -417,20 +717,27 @@ const CabinetPage: React.FC = () => {
     if (!editingUserId) return;
     try {
       const values = await adminUserForm.validateFields();
-      updateUser(editingUserId, {
-        username: values.username.trim(),
-        role: values.role,
-        teamId: values.teamId || null,
-        profile: {
-          name: values.name.trim(),
-          school: values.school.trim(),
-          grade: values.grade.trim(),
-          phone: values.phone.trim(),
-          email: values.email.trim(),
-          profilePicture: (values.profilePicture || "").trim(),
-          aboutMe: values.aboutMe.trim(),
-        },
-      });
+      const editingUser = allUsers.find((user) => user.id === editingUserId);
+      if (!editingUser) throw new Error("User not found");
+
+      await saveAccountProfileToApi(editingUser, values, values.role, values.teamId || undefined);
+      const updatedUser = buildUpdatedUser(
+        editingUser,
+        values,
+        values.role,
+        values.teamId || undefined
+      );
+
+      if (getAllUsers().some((user) => user.id === editingUserId)) {
+        updateUser(editingUserId, {
+          username: values.username.trim(),
+          role: values.role,
+          teamId: values.teamId || null,
+          profile: updatedUser.profile,
+        });
+      }
+      setAllUsers((prev) => prev.map((user) => (user.id === editingUserId ? updatedUser : user)));
+      if (currentUser?.id === editingUserId) storeAuthUser(updatedUser);
       setEditingUserId(null);
       message.success("User updated.");
       refreshCurrentUser();
@@ -439,20 +746,6 @@ const CabinetPage: React.FC = () => {
       const text = error instanceof Error ? error.message : "Failed to update user.";
       message.error(text);
     }
-  };
-
-  const handleDeleteAnyUser = (user: PublicUserRecord) => {
-    if (!window.confirm(`Delete user "${user.username}"?`)) return;
-
-    deleteUser(user.id);
-    if (currentUser?.id === user.id) {
-      logout();
-      navigate("/signin");
-      return;
-    }
-    message.success("User deleted.");
-    refreshCurrentUser();
-    refreshPageData();
   };
 
   const openTeamEditor = (teamRecord: TeamRecord) => {
@@ -532,6 +825,13 @@ const CabinetPage: React.FC = () => {
       ),
     },
     {
+      title: "Date of birth",
+      key: "dateOfBirth",
+      responsive: ["lg" as const],
+      render: (_: unknown, record: PublicUserRecord) =>
+        record.profile.dateOfBirth ? formatDisplayDate(record.profile.dateOfBirth) : "-",
+    },
+    {
       title: "Role",
       key: "role",
       render: (_: unknown, record: PublicUserRecord) => (
@@ -549,16 +849,11 @@ const CabinetPage: React.FC = () => {
     {
       title: "Actions",
       key: "actions",
-      width: 190,
+      width: 90,
       render: (_: unknown, record: PublicUserRecord) => (
-        <Space>
-          <Button size="small" onClick={() => openUserEditor(record)}>
-            Edit
-          </Button>
-          <Button size="small" danger icon={<DeleteOutlined />} onClick={() => handleDeleteAnyUser(record)}>
-            Delete
-          </Button>
-        </Space>
+        <Button size="small" onClick={() => openUserEditor(record)}>
+          Edit
+        </Button>
       ),
     },
   ];
@@ -567,31 +862,40 @@ const CabinetPage: React.FC = () => {
     {
       title: "Team",
       key: "name",
-      render: (_: unknown, record: TeamRecord) => (
+      render: (_: unknown, record: TeamModerationRecord) => (
         <div>
           <div className="font-semibold">{record.name}</div>
-          <div className="text-xs text-gray-500">{record.memberIds.length} members</div>
+          <div className="text-xs text-gray-500">
+            {record.members.length || record.memberIds.length} members
+          </div>
         </div>
       ),
     },
     {
+      title: "Status",
+      key: "status",
+      responsive: ["md" as const],
+      render: (_: unknown, record: TeamModerationRecord) => record.status || "-",
+    },
+    {
+      title: "Age group",
+      key: "ageGroup",
+      responsive: ["md" as const],
+      render: (_: unknown, record: TeamModerationRecord) => record.ageGroup || "-",
+    },
+    {
       title: "Vehicle docs",
       key: "docs",
-      render: (_: unknown, record: TeamRecord) => record.vehicleDocuments.length,
+      render: (_: unknown, record: TeamModerationRecord) => record.vehicleDocuments.length,
     },
     {
       title: "Actions",
       key: "actions",
-      width: 190,
-      render: (_: unknown, record: TeamRecord) => (
-        <Space>
-          <Button size="small" onClick={() => openTeamEditor(record)}>
-            Edit
-          </Button>
-          <Button size="small" danger icon={<DeleteOutlined />} onClick={() => handleDeleteAnyTeam(record)}>
-            Delete
-          </Button>
-        </Space>
+      width: 90,
+      render: (_: unknown, record: TeamModerationRecord) => (
+        <Button size="small" onClick={() => setViewingTeam(record)}>
+          View
+        </Button>
       ),
     },
   ];
@@ -622,6 +926,22 @@ const CabinetPage: React.FC = () => {
                 rules={[{ required: true, message: "Name is required." }]}
               >
                 <Input />
+              </Form.Item>
+              <Form.Item
+                name="dateOfBirth"
+                label="Date of birth"
+                normalize={(value: string) => formatDateInput(value)}
+                rules={[
+                  {
+                    validator: (_, value: string) => {
+                      if (!value) return Promise.resolve();
+                      if (parseDateString(value)) return Promise.resolve();
+                      return Promise.reject(new Error("Invalid date format (use DD.MM.YYYY)."));
+                    },
+                  },
+                ]}
+              >
+                <Input placeholder="DD.MM.YYYY" maxLength={10} autoComplete="bday" />
               </Form.Item>
               <Form.Item name="school" label="School">
                 <Input />
@@ -681,9 +1001,6 @@ const CabinetPage: React.FC = () => {
                 )}
               </div>
             </div>
-            <Form.Item name="aboutMe" label="About me">
-              <Input.TextArea rows={4} maxLength={2000} showCount />
-            </Form.Item>
             <Space wrap>
               <Button type="primary" icon={<SaveOutlined />} onClick={handleProfileSave}>
                 Save profile
@@ -705,233 +1022,16 @@ const CabinetPage: React.FC = () => {
           </Space>
         </Card>
 
-        {(canManageOwnTeam || isSuperAdmin) && currentUser.teamId && (
-          <Card title={<span><TeamOutlined /> Team Management</span>}>
-            {team ? (
-              <>
-                <Form form={teamForm} layout="vertical">
-                  <Form.Item
-                    name="name"
-                    label="Team name"
-                    rules={[{ required: true, message: "Team name is required." }]}
-                  >
-                    <Input />
-                  </Form.Item>
-                  <Form.Item name="description" label="Team description">
-                    <Input.TextArea rows={3} />
-                  </Form.Item>
-                  <Form.Item name="profilePicture" hidden>
-                    <Input />
-                  </Form.Item>
-                  <div className="mb-4">
-                    <div className="font-semibold mb-2">Team profile picture</div>
-                    {watchedTeamProfilePicture ? (
-                      <div className="mb-2">
-                        <Image
-                          src={watchedTeamProfilePicture}
-                          alt="Team profile"
-                          width={140}
-                          className="rounded"
-                        />
-                      </div>
-                    ) : (
-                      <Text type="secondary">No team profile picture uploaded.</Text>
-                    )}
-                    <div className="mt-2 flex items-center gap-3 flex-wrap">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={async (event) => {
-                          const file = event.target.files?.[0];
-                          if (!file) return;
-                          try {
-                            const encoded = await readFileAsDataUrl(file);
-                            teamForm.setFieldValue("profilePicture", encoded);
-                          } catch {
-                            message.error("Failed to read profile picture.");
-                          } finally {
-                            event.target.value = "";
-                          }
-                        }}
-                      />
-                      {watchedTeamProfilePicture && (
-                        <Button onClick={() => teamForm.setFieldValue("profilePicture", "")}>
-                          Remove picture
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                  <Form.Item name="vehicleDescription" label="Vehicle description">
-                    <Input.TextArea rows={3} />
-                  </Form.Item>
-                </Form>
-
-                <Space direction="vertical" className="w-full" size="middle">
-                  <div>
-                    <div className="font-semibold mb-2">Vehicle pictures</div>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      onChange={async (event) => {
-                        await handleAddTeamPictures(event.target.files, "own");
-                        event.target.value = "";
-                      }}
-                    />
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
-                      {teamPictures.map((picture) => (
-                        <div key={picture} className="border rounded p-2">
-                          <Image src={picture} alt="Vehicle" className="rounded" />
-                          <Button
-                            type="link"
-                            danger
-                            onClick={() =>
-                              setTeamPictures((prev) => prev.filter((item) => item !== picture))
-                            }
-                          >
-                            Remove
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="font-semibold mb-2">Vehicle documents</div>
-                    <input
-                      type="file"
-                      multiple
-                      onChange={async (event) => {
-                        await handleAddTeamDocuments(event.target.files, "own");
-                        event.target.value = "";
-                      }}
-                    />
-                    <Space direction="vertical" className="w-full mt-3">
-                      {teamDocuments.map((document) => (
-                        <div
-                          key={document.id}
-                          className="flex items-center justify-between border rounded px-3 py-2"
-                        >
-                          <div>
-                            <div className="font-medium">{document.name}</div>
-                            <div className="text-xs text-gray-500">{document.type}</div>
-                          </div>
-                          <Button
-                            danger
-                            type="link"
-                            onClick={() =>
-                              setTeamDocuments((prev) =>
-                                prev.filter((item) => item.id !== document.id)
-                              )
-                            }
-                          >
-                            Delete
-                          </Button>
-                        </div>
-                      ))}
-                    </Space>
-                  </div>
-
-                  <div>
-                    <div className="font-semibold mb-2">Team members</div>
-                    <Table<PublicUserRecord>
-                      dataSource={teamMembers}
-                      rowKey="id"
-                      pagination={false}
-                      columns={[
-                        {
-                          title: "Name",
-                          key: "name",
-                          render: (_: unknown, record: PublicUserRecord) =>
-                            record.profile.name || "-",
-                        },
-                        {
-                          title: "Role",
-                          key: "role",
-                          render: (_: unknown, record: PublicUserRecord) => (
-                            <Tag>{roleLabel(record.role)}</Tag>
-                          ),
-                        },
-                        {
-                          title: "Grade",
-                          key: "grade",
-                          render: (_: unknown, record: PublicUserRecord) =>
-                            record.profile.grade || "-",
-                        },
-                        {
-                          title: "Action",
-                          key: "action",
-                          width: 120,
-                          render: (_: unknown, record: PublicUserRecord) =>
-                            record.id !== currentUser.id ? (
-                              <Button
-                                size="small"
-                                danger
-                                onClick={() => handleKickOwnTeamMember(record.id)}
-                              >
-                                Kick
-                              </Button>
-                            ) : (
-                              <Text type="secondary">You</Text>
-                            ),
-                        },
-                      ]}
-                    />
-                  </div>
-
-                  <div>
-                    <div className="font-semibold mb-2">Team invitation links</div>
-                    <Button onClick={handleCreateTeamInvite}>Create and copy invitation link</Button>
-                    <Space direction="vertical" className="w-full mt-3">
-                      {teamInvites.length === 0 ? (
-                        <Text type="secondary">No active invitation links.</Text>
-                      ) : (
-                        teamInvites.map((invite) => (
-                          <div
-                            key={invite.id}
-                            className="flex items-center justify-between border rounded px-3 py-2 gap-3"
-                          >
-                            <div>
-                              <div className="font-semibold tracking-wide">Invitation link</div>
-                              <div className="text-xs text-gray-500">
-                                Created: {formatDisplayDate(invite.createdAt)}
-                              </div>
-                            </div>
-                            <Space>
-                              <Button
-                                size="small"
-                                icon={<CopyOutlined />}
-                                onClick={() => handleCopyInviteLink(invite.code)}
-                              >
-                                Copy link
-                              </Button>
-                              <Button
-                                size="small"
-                                danger
-                                onClick={() => handleRevokeTeamInvite(invite.id)}
-                              >
-                                Revoke
-                              </Button>
-                            </Space>
-                          </div>
-                        ))
-                      )}
-                    </Space>
-                  </div>
-                </Space>
-
-                <Space wrap className="mt-4">
-                  <Button type="primary" icon={<SaveOutlined />} onClick={handleSaveOwnTeam}>
-                    Save team
-                  </Button>
-                  <Button danger icon={<DeleteOutlined />} onClick={handleDeleteOwnTeam}>
-                    Delete team
-                  </Button>
-                </Space>
-              </>
-            ) : (
-              <Alert type="info" message="No team assigned." />
-            )}
+        {canManageOwnTeam && !isSuperAdmin && (
+          <Card title={<span><TeamOutlined /> Role: Team Moderation</span>}>
+            <Table<TeamModerationRecord>
+              dataSource={allTeams}
+              rowKey="id"
+              columns={teamColumns}
+              loading={teamsLoading}
+              pagination={allTeams.length > 10 ? { pageSize: 10 } : false}
+              locale={{ emptyText: "No team assigned." }}
+            />
           </Card>
         )}
 
@@ -942,15 +1042,17 @@ const CabinetPage: React.FC = () => {
                 dataSource={allUsers}
                 rowKey="id"
                 columns={userColumns}
+                loading={usersLoading}
                 pagination={allUsers.length > 10 ? { pageSize: 10 } : false}
               />
             </Card>
 
             <Card title="Super Admin: Team Moderation">
-              <Table<TeamRecord>
+              <Table<TeamModerationRecord>
                 dataSource={allTeams}
                 rowKey="id"
                 columns={teamColumns}
+                loading={teamsLoading}
                 pagination={allTeams.length > 10 ? { pageSize: 10 } : false}
               />
             </Card>
@@ -984,6 +1086,8 @@ const CabinetPage: React.FC = () => {
                 options={[
                   { value: "participant", label: roleLabel("participant") },
                   { value: "team_leader", label: roleLabel("team_leader") },
+                  { value: "pilot", label: roleLabel("pilot") },
+                  { value: "reserve_pilot", label: roleLabel("reserve_pilot") },
                   { value: "supervisor", label: roleLabel("supervisor") },
                   { value: "admin", label: roleLabel("admin") },
                   { value: "super_admin", label: roleLabel("super_admin") },
@@ -1003,6 +1107,23 @@ const CabinetPage: React.FC = () => {
               rules={[{ required: true, message: "Name is required." }]}
             >
               <Input />
+            </Form.Item>
+            <Form.Item
+              name="dateOfBirth"
+              label="Date of birth"
+              normalize={(value: string) => formatDateInput(value)}
+              rules={[
+                { required: true, message: "Date of birth is required." },
+                {
+                  validator: (_, value: string) => {
+                    if (!value) return Promise.resolve();
+                    if (parseDateString(value)) return Promise.resolve();
+                    return Promise.reject(new Error("Invalid date format (use DD.MM.YYYY)."));
+                  },
+                },
+              ]}
+            >
+              <Input placeholder="DD.MM.YYYY" maxLength={10} autoComplete="bday" />
             </Form.Item>
             <Form.Item name="school" label="School">
               <Input />
@@ -1062,10 +1183,93 @@ const CabinetPage: React.FC = () => {
               )}
             </div>
           </div>
-          <Form.Item name="aboutMe" label="About me">
-            <Input.TextArea rows={3} />
-          </Form.Item>
         </Form>
+      </Modal>
+
+      <Modal
+        open={viewingTeam !== null}
+        title="Team details"
+        onCancel={() => setViewingTeam(null)}
+        footer={[
+          <Button key="close" onClick={() => setViewingTeam(null)}>
+            Close
+          </Button>,
+        ]}
+        width={900}
+      >
+        {viewingTeam && (
+          <div className="space-y-4">
+            <Descriptions bordered size="small" column={1}>
+              <Descriptions.Item label="Team">{viewingTeam.name}</Descriptions.Item>
+              <Descriptions.Item label="Status">{viewingTeam.status || "-"}</Descriptions.Item>
+              <Descriptions.Item label="Age group">{viewingTeam.ageGroup || "-"}</Descriptions.Item>
+              <Descriptions.Item label="Institution">{viewingTeam.institution || "-"}</Descriptions.Item>
+              <Descriptions.Item label="City/region">{viewingTeam.cityOrRegion || "-"}</Descriptions.Item>
+              <Descriptions.Item label="Applied">
+                {viewingTeam.appliedAt ? formatDisplayDate(viewingTeam.appliedAt) : "-"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Responsible person">
+                {viewingTeam.responsiblePerson?.fullName || "-"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Responsible contact">
+                {[viewingTeam.responsiblePerson?.email, viewingTeam.responsiblePerson?.phone]
+                  .filter(Boolean)
+                  .join(" / ") || "-"}
+              </Descriptions.Item>
+              <Descriptions.Item label="How heard about">
+                {viewingTeam.howHeardAbout || "-"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Comments">{viewingTeam.comments || "-"}</Descriptions.Item>
+              <Descriptions.Item label="Vehicle description">
+                {viewingTeam.vehicleDescription || "-"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Vehicle documents">
+                {viewingTeam.vehicleDocuments.length}
+              </Descriptions.Item>
+            </Descriptions>
+
+            <div>
+              <div className="font-semibold mb-2">Members</div>
+              <Table<TeamModerationMember>
+                dataSource={viewingTeam.members}
+                rowKey="key"
+                size="small"
+                pagination={false}
+                columns={[
+                  {
+                    title: "Name",
+                    dataIndex: "fullName",
+                    key: "fullName",
+                  },
+                  {
+                    title: "Role",
+                    dataIndex: "role",
+                    key: "role",
+                    render: (value: string | undefined) => teamRoleLabel(value),
+                  },
+                  {
+                    title: "Date of birth",
+                    dataIndex: "dateOfBirth",
+                    key: "dateOfBirth",
+                    render: (value: string | undefined) => (value ? formatDisplayDate(value) : "-"),
+                  },
+                  {
+                    title: "Institution",
+                    dataIndex: "educationalInstitution",
+                    key: "educationalInstitution",
+                    render: (value: string | undefined) => value || "-",
+                  },
+                  {
+                    title: "Contact",
+                    key: "contact",
+                    render: (_: unknown, record: TeamModerationMember) =>
+                      [record.email, record.phone].filter(Boolean).join(" / ") || "-",
+                  },
+                ]}
+              />
+            </div>
+          </div>
+        )}
       </Modal>
 
       <Modal

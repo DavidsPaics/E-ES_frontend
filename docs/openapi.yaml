@@ -893,10 +893,11 @@ components:
       required:
         - fullName
         - dateOfBirth
-        - password
-        - username
-        - email
-        - phoneNumber
+        - parole
+        - lietotajvards
+        - epasts
+        - telefonanumurs
+        - komandasNosaukums
         - role
       properties:
         key:
@@ -909,20 +910,20 @@ components:
           type: string
           format: date
           example: 2005-04-12
-        password:
+        parole:
           type: string
           example: secret123
-        username:
+        lietotajvards:
           type: string
           example: janis.b
-        email:
+        epasts:
           type: string
           format: email
           example: janis@example.com
-        phoneNumber:
+        telefonanumurs:
           type: string
           example: +37112345678
-        teamName:
+        komandasNosaukums:
           type: string
           example: Volt Racers
         role:
@@ -940,6 +941,8 @@ components:
         dateOfBirth:
           type: string
           format: date
+        educationalInstitution:
+          type: string
         role:
           type: string
           example: member
@@ -948,17 +951,29 @@ components:
         id:
           type: string
 
-    AccountInfo:
+    ResponsiblePerson:
       type: object
       properties:
-        cilveks:
-          $ref: '#/components/schemas/TeamMember'
-        username:
+        fullName:
+          type: string
+        phone:
           type: string
         email:
           type: string
+        status:
+          type: string
+
+    AccountInfo:
+      type: object
+      properties:
+        dati:
+          $ref: '#/components/schemas/TeamMember'
+        lietotajvards:
+          type: string
+        epasts:
+          type: string
           format: email
-        phoneNumber:
+        telefonanumurs:
           type: string
 
     AdminInfo:
@@ -966,7 +981,7 @@ components:
       properties:
         key:
           type: string
-        username:
+        lietotajvards:
           type: string
         superadmin:
           type: boolean
@@ -1025,19 +1040,11 @@ components:
           type: string
           example: Riga
         members:
-          type: integer
-          example: 4
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamMember'
         responsiblePerson:
-          type: object
-          properties:
-            fullName:
-              type: string
-            phone:
-              type: string
-            email:
-              type: string
-            status:
-              type: string
+          $ref: '#/components/schemas/ResponsiblePerson'
         howHeardAbout:
           type: string
         comments:
@@ -1069,18 +1076,11 @@ components:
         cityOrRegion:
           type: string
         members:
-          type: integer
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamMember'
         responsiblePerson:
-          type: object
-          properties:
-            fullName:
-              type: string
-            phone:
-              type: string
-            email:
-              type: string
-            status:
-              type: string
+          $ref: '#/components/schemas/ResponsiblePerson'
         howHeardAbout:
           type: string
         comments:

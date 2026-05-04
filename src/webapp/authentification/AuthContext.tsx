@@ -39,6 +39,8 @@ function normalizeRole(value: unknown): PublicUserRecord["role"] {
   if (
     value === "participant" ||
     value === "team_leader" ||
+    value === "pilot" ||
+    value === "reserve_pilot" ||
     value === "supervisor" ||
     value === "admin" ||
     value === "super_admin"
@@ -57,9 +59,16 @@ function normalizeLoginUser(payload: unknown, username: string): PublicUserRecor
   const source = unwrapLoginPayload(payload);
   if (!isRecord(source)) return makeSessionUser(username);
 
-  const teamMember = isRecord(source.cilveks) ? source.cilveks : undefined;
+  const teamMember = isRecord(source.dati)
+    ? source.dati
+    : isRecord(source.cilveks)
+      ? source.cilveks
+      : undefined;
   const profileSource = isRecord(source.profile) ? source.profile : teamMember ?? source;
-  const normalizedUsername = firstString([source.username, source.login, source.email], username);
+  const normalizedUsername = firstString(
+    [source.lietotajvards, source.username, source.login, source.epasts, source.email],
+    username
+  );
   const isAdminInfo = "superadmin" in source;
 
   return {
@@ -73,14 +82,14 @@ function normalizeLoginUser(payload: unknown, username: string): PublicUserRecor
         ? "super_admin"
         : "admin"
       : normalizeRole(profileSource.role ?? source.role ?? source.type),
-    teamId: firstString([source.teamId, source.team_id], "") || undefined,
+    teamId: firstString([source.teamId, source.team_id, source.komandasId], "") || undefined,
     profile: {
       name: firstString([profileSource.name, profileSource.fullName, profileSource.full_name], normalizedUsername),
-      dateOfBirth: firstString([profileSource.dateOfBirth], "") || undefined,
+      dateOfBirth: firstString([profileSource.dateOfBirth, profileSource.dzimsanasDatums], "") || undefined,
       school: firstString([profileSource.school, profileSource.educationalInstitution], ""),
       grade: firstString([profileSource.grade, profileSource.classOrYear], ""),
-      phone: firstString([source.phoneNumber, profileSource.phone, profileSource.phoneNumber], ""),
-      email: firstString([source.email, profileSource.email], ""),
+      phone: firstString([source.telefonanumurs, source.phoneNumber, profileSource.phone, profileSource.phoneNumber], ""),
+      email: firstString([source.epasts, source.email, profileSource.email], ""),
       profilePicture: firstString([profileSource.profilePicture, profileSource.avatar], ""),
       aboutMe: firstString([profileSource.aboutMe, profileSource.bio], ""),
     },
