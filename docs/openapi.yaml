@@ -1,107 +1,157 @@
 openapi: 3.0.3
 info:
   title: E-ES Link API
-  description: |
-    API for the E-ES Link championship and team application platform.
-    This specification describes both implemented endpoints and planned operations.
-  version: 1.1.0
+  version: 2.1.0-intended
+  description: >-
+    Aktuālais API līgums E-ES Link čempionāta un komandu pieteikšanās platformai.
+    Lietotāja reģistrācijas un pārējie galapunkti precīzi attēlo gan veiksmīgās, 
+    gan kļūdu JSON atbildes, ko kontrolē Go handleru httpResult struktūra.
   contact:
     name: E-ES Link Team
 servers:
-  - url: https://izv.svaza.lv
-    description: Production server
-  - url: http://localhost:8000
-    description: Local development server
+  - url: https://e-es.lv
+    description: Produkcijas serveris
+  - url: http://localhost:1884
+    description: Lokālais izstrādes serveris
 
 tags:
-  - name: Auth
-    description: Authentication and current session information
-  - name: Accounts
-    description: Account registration, verification, and management
-  - name: Teams
-    description: Team applications and team-related operations
-  - name: Competitors
-    description: Competitor and car management
-  - name: Races
-    description: Race configuration and event operations
-  - name: Results
-    description: Race results and lookup
-  - name: Points
-    description: Points submission and removal
-  - name: Leaderboard
-    description: Leaderboard and rankings
-  - name: Admin
-    description: Administrative user management
-  - name: News
-    description: Public news article management
-  - name: Events
-    description: Competition event management
-  - name: WebSocket
-    description: Real-time live data streaming
   - name: Test
-    description: Internal test endpoints
+    description: Iekšējie testa galapunkti
+  - name: Auth
+    description: Autentifikācija un sesijas informācija
+  - name: Accounts
+    description: Lietotāju kontu reģistrācija, verifikācija un pārvaldība
+  - name: Teams
+    description: Komandu pieteikumi un apstiprināto komandu datu operācijas
+  - name: Races
+    description: Sacensību dzīvescikla un konfigurācijas operācijas
+  - name: Results
+    description: Sacensību rezultātu apskate
+  - name: Points
+    description: Punktu iesniegšana un dzēšana
+  - name: Leaderboard
+    description: Kopvērtējuma un rangu operācijas
+  - name: Admin
+    description: Administratoru kontu operācijas
+  - name: News
+    description: Ziņu sadaļas pārvaldība
+  - name: Events
+    description: Pasākumu/notikumu pārvaldība
+  - name: WebSocket
+    description: Reāllaika datu plūsma
 
 paths:
   /api/test:
     get:
-      tags:
-        - Test
-      summary: Health check and test endpoint
-      description: Simple test endpoint used during development.
+      tags: [Test]
+      summary: Testa galapunkts
+      x-implemented: true
       responses:
         '200':
-          description: OK
+          description: HTML testa atbilde
           content:
-            application/json:
+            text/html:
               schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: ok
+                type: string
 
   /api/testdb:
     get:
-      tags:
-        - Test
-      summary: Database connectivity test
-      description: Internal endpoint used to verify database connectivity.
+      tags: [Test]
+      summary: Datubāzes veselības pārbaude
+      x-implemented: true
       responses:
         '200':
-          description: OK
+          description: Informācija par datubāzes savienojumu
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: database ok
-
-  /api/submit-form:
+                type: string
+                example: Database is healthy
+  
+  /api/mqtt-logs/{limit}:
+    get:
+      tags: [Test]
+      summary: Iegūt pēdējos MQTT logus
+      x-implemented: true
+      parameters:
+        - $ref: '#/components/parameters/limitParam'
+      responses:
+        '200':
+          description: MQTT logu saraksts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MQTTMessage'
+        '500':
+          description: Iekšējā servera kļūme vai datubāzes piekļuves kļūme
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  
+  /api/mqtt-message:
     post:
-      tags:
-        - Test
-      summary: Submit test form data
-      description: Internal endpoint for test form submission.
+      tags: [Test]
+      summary: Iesniegt MQTT ziņu
+      x-implemented: true
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
+              $ref: '#/components/schemas/MQTTMessage'
       responses:
         '200':
-          description: Received form data
+          description: MQTT ziņa veiksmīgi iesniegta
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: MQTT message sent successfully
+        '400':
+          description: Nekorekti dati vai kļūda JSON validācijā
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Iekšējā servera kļūme vai MQTT ziņas sūtīšanas kļūme
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
-  /api/register:
+  /api/login:
+    get:
+      tags: [Auth]
+      summary: Iegūt pašlaik autentificēto kontu
+      x-implemented: true
+      responses:
+        '200':
+          description: Autentificētā konta informācija
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/Account'
+                  - $ref: '#/components/schemas/AdminAccount'
+        '401':
+          description: Neautorizēts pieprasījums
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/register-account:
     post:
-      tags:
-        - Accounts
-      summary: Register a new account or submit a new account application
-      description: |
-        Registers a new account directly for applications without a team,
-        or submits an account application for verification when the request is team-related.
+      tags: [Accounts]
+      summary: Reģistrēt jaunu kontu parastajā plūsmā
+      x-implemented: true
       requestBody:
         required: true
         content:
@@ -110,441 +160,401 @@ paths:
               $ref: '#/components/schemas/AccountApplication'
       responses:
         '200':
-          description: Accepted or pending verification
+          description: Reģistrācija veiksmīga
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/StatusResponse'
         '400':
-          description: Invalid request
-
-  /api/login:
-    get:
-      tags:
-        - Auth
-      summary: Get current authenticated account
-      description: Returns the authenticated admin or user account from the current request context.
-      security:
-        - BearerAuth: []
-      responses:
-        '200':
-          description: Authenticated account information
+          description: Nekorekti dati vai kļūda JSON validācijā
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: '#/components/schemas/AccountInfo'
-                  - $ref: '#/components/schemas/AdminInfo'
-        '401':
-          description: Unauthorized
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Konflikts (piemēram, lietotājvārds jau ir aizņemts)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Iekšējā servera vai datubāzes kļūme
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
-  /api/account-applications:
-    get:
-      tags:
-        - Accounts
-      summary: List pending account applications
-      description: |
-        Returns all account applications for superadmins, or team-specific applications for team leaders.
-      security:
-        - BearerAuth: []
+  /api/register-account/{uniqueID}:
+    post:
+      tags: [Accounts]
+      summary: Reģistrēt kontu ar komandas līdera verifikācijas identifikatoru
+      x-implemented: true
+      parameters:
+        - $ref: '#/components/parameters/uniqueIDParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountApplication'
       responses:
         '200':
-          description: List of account applications
+          description: Reģistrācija apstrādāta un pievienota komandai
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+        '400':
+          description: Nekorekti dati vai kļūdains unikālais identifikators
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Konflikts (lietotājvārds jau eksistē)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Servera kļūme
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/unverified-accounts:
+    get:
+      tags: [Accounts]
+      summary: Saraksts ar neverificētajiem kontiem
+      x-implemented: true
+      responses:
+        '200':
+          description: Neverificēto kontu saraksts
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/AccountApplication'
+                  $ref: '#/components/schemas/Account'
         '403':
-          description: Forbidden
+          description: Piekļuve liegta (nav tiesību)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /api/account-verification-info/{key}:
     get:
-      tags:
-        - Accounts
-      summary: Get verification criteria for an account application
-      description: Returns verification metadata for a specific account application.
-      security:
-        - BearerAuth: []
+      tags: [Accounts]
+      summary: Iegūt verifikācijas kritērijus pēc konta atslēgas
+      x-implemented: true
       parameters:
-        - name: key
-          in: path
-          required: true
-          schema:
-            type: string
-          description: Account application key
+        - $ref: '#/components/parameters/keyParam'
       responses:
         '200':
-          description: Verification criteria
+          description: Verifikācijas kritēriju dati
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AccountVerificationCriteria'
         '404':
-          description: Application not found
-        '401':
-          description: Unauthorized
+          description: Konts pēc norādītās atslēgas netika atrasts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
-  /api/verify-account-application/{key}:
+  /api/verify-account/{key}:
     post:
-      tags:
-        - Accounts
-      summary: Verify and register an account application
-      description: |
-        Verifies the account application identified by key and registers the account.
-        Superadmins can verify team leader applications and all other applications.
-      security:
-        - BearerAuth: []
+      tags: [Accounts]
+      summary: Verificēt un aktivizēt kontu
+      x-implemented: true
       parameters:
-        - name: key
-          in: path
-          required: true
-          schema:
-            type: string
-          description: Account application key
+        - $ref: '#/components/parameters/keyParam'
       responses:
         '200':
-          description: Account verified and registered
+          description: Konts veiksmīgi aktivizēts
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/StatusResponse'
         '403':
-          description: Forbidden
-        '404':
-          description: Application not found
-
-  /api/account-applications/{key}:
-    patch:
-      tags:
-        - Accounts
-      summary: Planned manual account application verification or update
-      description: |
-        Planned endpoint for manual account application verification and updates.
-        This route is not currently registered in the runtime router.
-      x-planned: true
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                status:
-                  type: string
-                  description: Verification status update
-      responses:
-        '200':
-          description: Application updated successfully
-        '404':
-          description: Application not found
-        '401':
-          description: Unauthorized
+          description: Nav tiesību veikt verifikāciju
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /api/accounts:
     get:
-      tags:
-        - Accounts
-      summary: List registered accounts
-      description: Returns all registered accounts for superadmins, or team-specific accounts for team leaders.
-      security:
-        - BearerAuth: []
+      tags: [Accounts]
+      summary: Iegūt lietotāju kontu sarakstu. Virsadministratoriem visu, komandas līderiem komandas dalībniekus un parastam kontam tikai sevi.
+      x-implemented: true
       responses:
         '200':
-          description: Accounts list
+          description: Kontu saraksts
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/AccountInfo'
-        '403':
-          description: Forbidden
+                  $ref: '#/components/schemas/Account'
 
   /api/account/{key}:
     patch:
-      tags:
-        - Accounts
-      summary: Update a registered account
-      description: Modify an existing registered account by key (superadmin only).
-      security:
-        - BearerAuth: []
+      tags: [Accounts]
+      summary: Atjaunināt lietotāja konta informāciju
+      x-implemented: true
       parameters:
-        - name: key
-          in: path
-          required: true
-          schema:
-            type: string
-          description: Account key
+        - $ref: '#/components/parameters/keyParam'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AccountInfo'
+              $ref: '#/components/schemas/Account'
       responses:
         '200':
-          description: Account updated successfully
+          description: Konts veiksmīgi atjaunināts
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/StatusResponse'
-        '403':
-          description: Forbidden
-        '404':
-          description: Account not found
+        '409':
+          description: Konflikts (izmainītais lietotājvārds jau ir aizņemts)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /api/admin-accounts:
     get:
-      tags:
-        - Admin
-      summary: List admin accounts
-      description: Return all admin accounts (superadmin only).
-      security:
-        - BearerAuth: []
+      tags: [Admin]
+      summary: Iegūt administratoru kontu sarakstu
+      x-implemented: true
       responses:
         '200':
-          description: Admin accounts list
+          description: Administratoru saraksts
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/AdminInfo'
-        '403':
-          description: Forbidden
+                  $ref: '#/components/schemas/AdminAccount'
 
   /api/admin-account/{key}:
     patch:
-      tags:
-        - Admin
-      summary: Update an admin account
-      description: Modify an existing admin account by key (superadmin only).
-      security:
-        - BearerAuth: []
+      tags: [Admin]
+      summary: Atjaunināt administratora kontu pēc tā atslēgas
+      x-implemented: true
       parameters:
-        - name: key
-          in: path
-          required: true
-          schema:
-            type: string
-          description: Admin key
+        - $ref: '#/components/parameters/keyParam'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AdminInfo'
+              $ref: '#/components/schemas/AdminAccount'
       responses:
         '200':
-          description: Admin account updated
+          description: Administrators atjaunināts
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/StatusResponse'
-        '403':
-          description: Forbidden
-        '404':
-          description: Admin account not found
+        '409':
+          description: Lietotājvārds jau eksistē
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/team-applications:
+    get:
+      tags: [Teams]
+      summary: Iegūt visus komandu pieteikumus. Ierobežotus datus par visiem var dabūt bez konteksta lietotāja. Virsadministratoriem visu komandu pilnīgie dati, komandu līderiem savas komandas pilnīgie dati.
+      x-implemented: true
+      responses:
+        '200':
+          description: Pieteikumu saraksts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RegistrationFormData'
+
+  /api/team-application:
+    post:
+      tags: [Teams]
+      summary: Jauna komandas pieteikuma iesniegšana
+      x-implemented: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistrationFormData'
+      responses:
+        '200':
+          description: Pieteikums veiksmīgi saņemts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+
+  /api/team/{key}:
+    get:
+      tags: [Teams]
+      summary: Iegūt apstiprinātas komandas datus pēc tās atslēgas
+      x-implemented: true
+      parameters:
+        - $ref: '#/components/parameters/keyParam'
+      responses:
+        '200':
+          description: Komandas dati
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamData'
+    patch:
+      tags: [Teams]
+      summary: Atjaunināt komandas datus pēc tās atslēgas
+      x-implemented: true
+      parameters:
+        - $ref: '#/components/parameters/keyParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeamData'
+      responses:
+        '200':
+          description: Komandas dati veiksmīgi laboti
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+    post:
+      tags: [Teams]
+      summary: Izveidot vai pārrakstīt komandas datus pēc atslēgas
+      x-implemented: true
+      parameters:
+        - $ref: '#/components/parameters/keyParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeamData'
+      responses:
+        '200':
+          description: Komandas dati veiksmīgi saglabāti
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
 
   /api/race/start:
     post:
-      tags:
-        - Races
-      summary: Start a race for a competitor
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RaceStartRequest'
+      tags: [Races]
+      summary: (NAV IMPLEMENTĒTS) Uzsākt braucienu/sacīksti
+      x-implemented: false
       responses:
-        '200':
-          description: Race started successfully
-        '400':
-          description: Invalid request
-        '401':
-          description: Unauthorized
+        '501':
+          description: Not implemented
 
   /api/car/finish:
     post:
-      tags:
-        - Races
-      summary: Finish a race for a competitor
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CarFinishRequest'
+      tags: [Races]
+      summary: (NAV IMPLEMENTĒTS) Reģistrēt automašīnas finišu
+      x-implemented: false
       responses:
-        '200':
-          description: Race finished successfully
-        '400':
-          description: Invalid request
-        '401':
-          description: Unauthorized
+        '501':
+          description: Not implemented
 
   /api/races:
     get:
-      tags:
-        - Races
-      summary: Get all race definitions
+      tags: [Races]
+      summary: (NAV IMPLEMENTĒTS) Iegūt sacīkšu sarakstu
+      x-implemented: false
       responses:
-        '200':
-          description: Race configurations
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/RaceLap'
+        '501':
+          description: Not implemented
     post:
-      tags:
-        - Races
-      summary: Update race configurations
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: array
-              items:
-                $ref: '#/components/schemas/RaceLap'
+      tags: [Races]
+      summary: (NAV IMPLEMENTĒTS) Izveidot jaunu sacīksti
+      x-implemented: false
       responses:
-        '200':
-          description: Race configurations saved
-        '401':
-          description: Unauthorized
+        '501':
+          description: Not implemented
 
   /api/race-config:
     get:
-      tags:
-        - Races
-      summary: Get race configuration metadata
+      tags: [Races]
+      summary: (NAV IMPLEMENTĒTS) Iegūt sacensību konfigurāciju
+      x-implemented: false
       responses:
-        '200':
-          description: Race configuration metadata
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/RaceConfig'
+        '501':
+          description: Not implemented
 
   /api/categories:
     get:
-      tags:
-        - Races
-      summary: Get all race categories
+      tags: [Races]
+      summary: (NAV IMPLEMENTĒTS) Iegūt automašīnu/sacensību kategorijas
+      x-implemented: false
       responses:
-        '200':
-          description: Race categories
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  type: string
+        '501':
+          description: Not implemented
 
   /api/results/{raceName}:
     get:
-      tags:
-        - Results
-      summary: Get race results
+      tags: [Results]
+      summary: (NAV IMPLEMENTĒTS) Iegūt rezultātus pēc sacīkstes nosaukuma
+      x-implemented: false
       parameters:
-        - name: raceName
-          in: path
-          required: true
-          schema:
-            type: string
-          description: Race name
+        - $ref: '#/components/parameters/raceNameParam'
       responses:
-        '200':
-          description: Race results
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/RaceResult'
-        '404':
-          description: Race not found
+        '501':
+          description: Not implemented
 
   /api/points:
     post:
-      tags:
-        - Points
-      summary: Submit points for competitors
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PointsSubmission'
+      tags: [Points]
+      summary: (NAV IMPLEMENTĒTS) Iesniegt punktus
+      x-implemented: false
       responses:
-        '200':
-          description: Points saved successfully
-        '401':
-          description: Unauthorized
+        '501':
+          description: Not implemented
     delete:
-      tags:
-        - Points
-      summary: Delete points for a race
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: raceName
-          in: query
-          required: true
-          schema:
-            type: string
-          description: Name of the race to clear points for
+      tags: [Points]
+      summary: (NAV IMPLEMENTĒTS) Dzēst punktus
+      x-implemented: false
       responses:
-        '200':
-          description: Points deleted successfully
-        '401':
-          description: Unauthorized
+        '501':
+          description: Not implemented
 
   /api/leaderboard/{ageGroup}:
     get:
-      tags:
-        - Leaderboard
-      summary: Get leaderboard by age group
+      tags: [Leaderboard]
+      summary: (NAV IMPLEMENTĒTS) Iegūt topu pēc vecuma grupas
+      x-implemented: false
       parameters:
-        - name: ageGroup
-          in: path
-          required: true
-          schema:
-            type: string
-          description: Age group identifier or "all"
+        - $ref: '#/components/parameters/ageGroupParam'
       responses:
-        '200':
-          description: Leaderboard data
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/LeaderboardEntry'
+        '501':
+          description: Not implemented
 
   /api/news:
     get:
-      tags:
-        - News
-      summary: Get all news articles
+      tags: [News]
+      summary: (NAV IMPLEMENTĒTS) Iegūt ziņu sarakstu
+      x-implemented: false
       responses:
         '200':
-          description: News articles list
+          description: Veiksmīga atbilde
           content:
             application/json:
               schema:
@@ -552,11 +562,9 @@ paths:
                 items:
                   $ref: '#/components/schemas/NewsArticle'
     post:
-      tags:
-        - News
-      summary: Create a news article
-      security:
-        - BearerAuth: []
+      tags: [News]
+      summary: (NAV IMPLEMENTĒTS) Izveidot ziņu rakstu
+      x-implemented: false
       requestBody:
         required: true
         content:
@@ -564,47 +572,29 @@ paths:
             schema:
               $ref: '#/components/schemas/NewsArticle'
       responses:
-        '201':
-          description: Article created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/NewsArticle'
-        '401':
-          description: Unauthorized
+        '501':
+          description: Not implemented
 
   /api/news/{id}:
     get:
-      tags:
-        - News
-      summary: Get a news article
+      tags: [News]
+      summary: (NAV IMPLEMENTĒTS) Iegūt ziņu pēc ID
+      x-implemented: false
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/idParam'
       responses:
         '200':
-          description: News article
+          description: Ziņas dati
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/NewsArticle'
-        '404':
-          description: Not found
     put:
-      tags:
-        - News
-      summary: Update a news article
-      security:
-        - BearerAuth: []
+      tags: [News]
+      summary: (NAV IMPLEMENTĒTS) Atjaunināt ziņu pēc ID
+      x-implemented: false
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/idParam'
       requestBody:
         required: true
         content:
@@ -612,77 +602,37 @@ paths:
             schema:
               $ref: '#/components/schemas/NewsArticle'
       responses:
-        '200':
-          description: Article updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/NewsArticle'
-        '404':
-          description: Not found
-        '401':
-          description: Unauthorized
+        '501':
+          description: Not implemented
     delete:
-      tags:
-        - News
-      summary: Delete a news article
-      security:
-        - BearerAuth: []
+      tags: [News]
+      summary: (NAV IMPLEMENTĒTS) Dzēst ziņu pēc ID
+      x-implemented: false
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/idParam'
       responses:
-        '200':
-          description: Article deleted successfully
-        '404':
-          description: Not found
-        '401':
-          description: Unauthorized
+        '501':
+          description: Not implemented
 
   /api/news/{id}/attachments:
     post:
-      tags:
-        - News
-      summary: Upload attachment to a news article
-      security:
-        - BearerAuth: []
+      tags: [News]
+      summary: (NAV IMPLEMENTĒTS) Pievienot pielikumus ziņai pēc ID
+      x-implemented: false
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              properties:
-                file:
-                  type: string
-                  format: binary
+        - $ref: '#/components/parameters/idParam'
       responses:
-        '201':
-          description: Attachment uploaded successfully
-        '400':
-          description: Invalid request
-        '401':
-          description: Unauthorized
-        '404':
-          description: Article not found
+        '501':
+          description: Not implemented
 
   /api/events:
     get:
-      tags:
-        - Events
-      summary: Get all events
+      tags: [Events]
+      summary: (NAV IMPLEMENTĒTS) Iegūt pasākumu sarakstu
+      x-implemented: false
       responses:
         '200':
-          description: Event list
+          description: Pasākumu saraksts
           content:
             application/json:
               schema:
@@ -690,11 +640,9 @@ paths:
                 items:
                   $ref: '#/components/schemas/CompetitionEvent'
     post:
-      tags:
-        - Events
-      summary: Create an event
-      security:
-        - BearerAuth: []
+      tags: [Events]
+      summary: (NAV IMPLEMENTĒTS) Izveidot jaunu pasākumu
+      x-implemented: false
       requestBody:
         required: true
         content:
@@ -702,183 +650,99 @@ paths:
             schema:
               $ref: '#/components/schemas/CompetitionEvent'
       responses:
-        '201':
-          description: Event created successfully
-        '401':
-          description: Unauthorized
+        '501':
+          description: Not implemented
 
   /api/events/{id}:
     get:
-      tags:
-        - Events
-      summary: Get a specific event
+      tags: [Events]
+      summary: (NAV IMPLEMENTĒTS) Iegūt pasākumu pēc ID
+      x-implemented: false
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/idParam'
       responses:
         '200':
-          description: Event details
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CompetitionEvent'
-        '404':
-          description: Not found
-    put:
-      tags:
-        - Events
-      summary: Update an event
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CompetitionEvent'
-      responses:
-        '200':
-          description: Event updated successfully
-        '404':
-          description: Not found
-        '401':
-          description: Unauthorized
-    delete:
-      tags:
-        - Events
-      summary: Delete an event
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Event deleted successfully
-        '404':
-          description: Not found
-        '401':
-          description: Unauthorized
-
-  /api/teams:
-    get:
-      tags:
-        - Teams
-      summary: Get all team applications
-      responses:
-        '200':
-          description: Team application list
+          description: Pasākuma dati
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/TeamApplication'
-
-  /api/team-application:
-    post:
-      tags:
-        - Teams
-      summary: Create a team application
-      description: Submit a new team registration application.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TeamApplication'
-      responses:
-        '201':
-          description: Team application created
-        '400':
-          description: Invalid request
-
-  /api/team:
-    patch:
-      tags:
-        - Teams
-      summary: Update team application data by key
-      description: Update a team application using data in the request body.
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TeamApplicationPatch'
-      responses:
-        '200':
-          description: Team application updated
-        '400':
-          description: Invalid request
-        '401':
-          description: Unauthorized
-
-  /api/team/{key}:
-    post:
-      tags:
-        - Teams
-      summary: Update team application data by key path
-      description: Submit updated team data using the application key in the path.
-      security:
-        - BearerAuth: []
+                  $ref: '#/components/schemas/CompetitionEvent'
+    put:
+      tags: [Events]
+      summary: (NAV IMPLEMENTELY) Atjaunināt pasākumu pēc ID
+      x-implemented: false
       parameters:
-        - name: key
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/idParam'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/TeamApplicationPatch'
+              $ref: '#/components/schemas/CompetitionEvent'
       responses:
-        '200':
-          description: Team application updated
-        '400':
-          description: Invalid request
-        '401':
-          description: Unauthorized
+        '501':
+          description: Not implemented
+    delete:
+      tags: [Events]
+      summary: (NAV IMPLEMENTĒTS) Dzēst pasākumu pēc ID
+      x-implemented: false
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      responses:
+        '501':
+          description: Not implemented
 
   /ws:
     get:
-      tags:
-        - WebSocket
-      summary: WebSocket live data endpoint
-      description: Upgrade to a WebSocket connection for live tracking data.
-      parameters:
-        - name: token
-          in: query
-          required: false
-          schema:
-            type: string
-          description: Optional access token
+      tags: [WebSocket]
+      summary: (NAV IMPLEMENTĒTS) Pieslēgšanās reāllaika datiem caur WebSocket Protokolu
+      x-implemented: false
       responses:
         '101':
-          description: WebSocket upgrade successful
+          description: Protokolu pārslēgšana (Switching Protocols)
 
 components:
-  securitySchemes:
-    BearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-      description: Bearer token for authenticated API access.
+  parameters:
+    limitParam:
+      name: limit
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+        default: 100
+    keyParam:
+      name: key
+      in: path
+      required: true
+      schema:
+        type: string
+    uniqueIDParam:
+      name: uniqueID
+      in: path
+      required: true
+      schema:
+        type: string
+    raceNameParam:
+      name: raceName
+      in: path
+      required: true
+      schema:
+        type: string
+    ageGroupParam:
+      name: ageGroup
+      in: path
+      required: true
+      schema:
+        type: string
+    idParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
 
   schemas:
     StatusResponse:
@@ -886,335 +750,46 @@ components:
       properties:
         status:
           type: string
-          example: accepted
-
-    AccountApplication:
-      type: object
-      required:
-        - fullName
-        - dateOfBirth
-        - parole
-        - lietotajvards
-        - epasts
-        - telefonanumurs
-        - komandasNosaukums
-        - role
-      properties:
-        key:
-          type: string
-          description: Application key, assigned dynamically
-        fullName:
-          type: string
-          example: Janis Berzins
-        dateOfBirth:
-          type: string
-          format: date
-          example: 2005-04-12
-        parole:
-          type: string
-          example: secret123
-        lietotajvards:
-          type: string
-          example: janis.b
-        epasts:
-          type: string
-          format: email
-          example: janis@example.com
-        telefonanumurs:
-          type: string
-          example: +37112345678
-        komandasNosaukums:
-          type: string
-          example: Volt Racers
-        role:
-          type: string
-          enum: [team_leader, member]
-          example: member
-
-    TeamMember:
+          example: "admin account updated"
+          
+    ErrorResponse:
       type: object
       properties:
-        key:
+        error:
           type: string
-        fullName:
-          type: string
-        dateOfBirth:
-          type: string
-          format: date
-        educationalInstitution:
-          type: string
-        role:
-          type: string
-          example: member
-        classOrYear:
-          type: string
-        id:
-          type: string
-
-    ResponsiblePerson:
+          example: "username already exists"
+    
+    MQTTMessage:
       type: object
       properties:
-        fullName:
+        topic:
           type: string
-        phone:
+          example: "test/topic"
+        payload:
           type: string
-        email:
-          type: string
-        status:
-          type: string
+          example: "This is a test MQTT message"
 
-    AccountInfo:
+    BilingualText:
       type: object
       properties:
-        dati:
-          $ref: '#/components/schemas/TeamMember'
-        lietotajvards:
+        lv:
           type: string
-        epasts:
-          type: string
-          format: email
-        telefonanumurs:
+        en:
           type: string
 
-    AdminInfo:
+    AttachedFile:
       type: object
       properties:
-        key:
+        name:
           type: string
-        lietotajvards:
+        type:
           type: string
-        superadmin:
-          type: boolean
-
-    AccountVerificationCriteria:
-      type: object
-      properties:
-        canRegister:
-          type: boolean
-        requiredFieldsPresent:
-          type: boolean
-        usernameAvailable:
-          type: boolean
-        noTeamNameProvided:
-          type: boolean
-        notTeamLeaderRole:
-          type: boolean
-        teamNameProvided:
-          type: boolean
-        teamApplicationExists:
-          type: boolean
-        teamMemberFound:
-          type: boolean
-        teamMemberRoleMatches:
-          type: boolean
-        noMatchingTeamMember:
-          type: boolean
-        teamLeaderRole:
-          type: boolean
-        teamLeaderMemberFound:
-          type: boolean
-        teamLeaderDateOfBirthMatch:
-          type: boolean
-
-    TeamApplication:
-      type: object
-      required:
-        - teamName
-        - ageGroup
-        - cityOrRegion
-        - members
-        - responsiblePerson
-      properties:
-        id:
+        url:
           type: string
-        teamName:
-          type: string
-          example: Volt Racers
-        ageGroup:
-          type: string
-          example: A
-        institution:
-          type: string
-          example: Rīgas Valsts 1. ģimnāzija
-        cityOrRegion:
-          type: string
-          example: Riga
-        members:
-          type: array
-          items:
-            $ref: '#/components/schemas/TeamMember'
-        responsiblePerson:
-          $ref: '#/components/schemas/ResponsiblePerson'
-        howHeardAbout:
-          type: string
-        comments:
-          type: string
-        confirmTruthful:
-          type: boolean
-        confirmRules:
-          type: boolean
-        confirmMedia:
-          type: boolean
-        appliedAt:
-          type: string
-          format: date-time
-        status:
-          type: string
-          example: pending
-
-    TeamApplicationPatch:
-      type: object
-      properties:
-        key:
-          type: string
-        teamName:
-          type: string
-        ageGroup:
-          type: string
-        institution:
-          type: string
-        cityOrRegion:
-          type: string
-        members:
-          type: array
-          items:
-            $ref: '#/components/schemas/TeamMember'
-        responsiblePerson:
-          $ref: '#/components/schemas/ResponsiblePerson'
-        howHeardAbout:
-          type: string
-        comments:
-          type: string
-        status:
-          type: string
-
-    RaceStartRequest:
-      type: object
-      required:
-        - raceName
-        - ID
-      properties:
-        raceName:
-          type: string
-        ID:
-          type: integer
-
-    CarFinishRequest:
-      type: object
-      required:
-        - ID
-      properties:
-        ID:
-          type: integer
-
-    RaceLap:
-      type: object
-      required:
-        - RaceName
-        - Lap
-        - Length
-      properties:
-        RaceName:
-          type: string
-        Lap:
-          type: integer
-        Length:
-          type: number
-          format: float
-
-    RaceConfig:
-      type: object
-      properties:
-        RaceName:
-          type: string
-        Length:
-          type: number
-        Coef:
-          type: number
-        SortBy:
-          type: string
-        Distribution:
-          type: array
-          items:
-            type: integer
-
-    RaceResult:
-      type: object
-      properties:
-        ID:
-          type: integer
-        Username:
-          type: string
-        avatar:
-          type: string
-        RaceName:
-          type: string
-        Lap:
-          type: integer
-        usedEnergy:
-          type: number
-        efficiency:
-          type: number
-        shellEfficiency:
-          type: number
-        averagePower:
-          type: number
-        averageSpeed:
-          type: number
-        elapsedTime:
-          type: string
-        points:
-          type: number
-
-    PointsSubmission:
-      type: object
-      required:
-        - raceName
-        - points
-      properties:
-        raceName:
-          type: string
-        points:
-          type: array
-          items:
-            type: object
-            properties:
-              ID:
-                type: integer
-              points:
-                type: number
-
-    LeaderboardEntry:
-      type: object
-      properties:
-        ID:
-          type: integer
-        username:
-          type: string
-        avatar:
-          type: string
-        position_change:
-          type: integer
-        categoryNames:
-          type: array
-          items:
-            type: string
-        categoryPoints:
-          type: array
-          items:
-            type: number
+          format: uri
 
     NewsArticle:
       type: object
-      required:
-        - id
-        - title
-        - summary
-        - content
-        - author
-        - date
-        - tags
-        - published
       properties:
         id:
           type: string
@@ -1243,26 +818,8 @@ components:
           items:
             $ref: '#/components/schemas/AttachedFile'
 
-    AttachedFile:
-      type: object
-      properties:
-        name:
-          type: string
-        type:
-          type: string
-        url:
-          type: string
-          format: uri
-
     CompetitionEvent:
       type: object
-      required:
-        - id
-        - title
-        - description
-        - date
-        - location
-        - status
       properties:
         id:
           type: string
@@ -1285,13 +842,208 @@ components:
           type: string
           enum: [upcoming, ongoing, completed]
 
-    BilingualText:
+    TeamMember:
       type: object
-      required:
-        - en
-        - lv
       properties:
-        en:
+        key:
           type: string
-        lv:
+        fullName:
           type: string
+        dateOfBirth:
+          type: string
+          format: date
+        educationalInstitution:
+          type: string
+        role:
+          type: string
+        classOrYear:
+          type: string
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+
+    AccountApplication:
+      type: object
+      properties:
+        parole:
+          type: string
+        salt:
+          type: string
+        lietotajvards:
+          type: string
+        epasts:
+          type: string
+          format: email
+        telefonanumurs:
+          type: string
+        komandasNosaukums:
+          type: string
+        role:
+          type: string
+
+    Account:
+      type: object
+      properties:
+        dati:
+          $ref: '#/components/schemas/TeamMember'
+        parole:
+          type: string
+        lietotajvards:
+          type: string
+        epasts:
+          type: string
+          format: email
+        telefonanumurs:
+          type: string
+        salt:
+          type: string
+        pendingTeamId:
+          type: string
+        registered:
+          type: boolean
+        educationalInstitution:
+          type: string
+        classOrYear:
+          type: string
+
+    AdminAccount:
+      type: object
+      properties:
+        key:
+          type: string
+        lietotajvards:
+          type: string
+        parole:
+          type: string
+        salt:
+          type: string
+        superadmin:
+          type: boolean
+
+    ResponsiblePerson:
+      type: object
+      properties:
+        fullName:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+          format: email
+        status:
+          type: string
+
+    RegistrationFormData:
+      type: object
+      properties:
+        id:
+          type: string
+        teamName:
+          type: string
+        ageGroup:
+          type: string
+        institution:
+          type: string
+          nullable: true
+        cityOrRegion:
+          type: string
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamMember'
+        responsiblePerson:
+          $ref: '#/components/schemas/ResponsiblePerson'
+        howHeardAbout:
+          type: string
+          nullable: true
+        comments:
+          type: string
+          nullable: true
+        confirmTruthful:
+          type: boolean
+        confirmRules:
+          type: boolean
+        confirmMedia:
+          type: boolean
+        appliedAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+
+    Car:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        category:
+          type: string
+
+    TeamData:
+      type: object
+      properties:
+        key:
+          type: string
+        carId:
+          type: string
+        teamName:
+          type: string
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/Account'
+        ageGroup:
+          type: string
+        institution:
+          type: string
+        cityOrRegion:
+          type: string
+        responsiblePerson:
+          $ref: '#/components/schemas/ResponsiblePerson'
+        avatar:
+          type: string
+        carData:
+          $ref: '#/components/schemas/Car'
+
+    AccountVerificationCriteria:
+      type: object
+      properties:
+        canRegister:
+          type: boolean
+        canLinkToTeam:
+          type: boolean
+        requiredFieldsPresent:
+          type: boolean
+        usernameAvailable:
+          type: boolean
+        noTeamNameProvided:
+          type: boolean
+          nullable: true
+        notTeamLeaderRole:
+          type: boolean
+          nullable: true
+        teamNameProvided:
+          type: boolean
+          nullable: true
+        teamApplicationExists:
+          type: boolean
+          nullable: true
+        teamMemberFound:
+          type: boolean
+          nullable: true
+        teamMemberRoleMatches:
+          type: boolean
+          nullable: true
+        noMatchingTeamMember:
+          type: boolean
+          nullable: true
+        teamLeaderRole:
+          type: boolean
+          nullable: true
+        teamLeaderMemberFound:
+          type: boolean
+          nullable: true

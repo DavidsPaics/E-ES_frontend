@@ -192,7 +192,7 @@ const ApplicationPage: React.FC = () => {
   const [formModalOpen, setFormModalOpen] = useState(false);
 
   const OPEN_DATE = new Date("2026-04-01T00:00:00");
-  const CLOSE_DATE = new Date("2026-05-15T23:59:59");
+  const CLOSE_DATE = new Date("2026-05-25T23:59:59");
 
   const isApplicationOpen = () => {
     const now = new Date();

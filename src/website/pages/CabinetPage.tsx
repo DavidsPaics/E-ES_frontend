@@ -30,6 +30,7 @@ import {
   ENDPOINT_ACCOUNT,
   ENDPOINT_ACCOUNT_APPLICATIONS,
   ENDPOINT_ACCOUNTS,
+  ENDPOINT_TEAM,
   ENDPOINT_TEAMS,
   ENDPOINT_VERIFY_ACCOUNT_APPLICATION,
 } from "@/webapp/config/endpoints";
@@ -94,6 +95,7 @@ interface TeamModerationMember {
 
 interface PendingTeamMemberApplication extends TeamModerationMember {
   teamName: string;
+  pendingTeamId?: string;
   username: string;
 }
 
@@ -233,21 +235,25 @@ function toTeamModerationId(name: string, fallback: string): string {
 function normalizeTeamMember(value: unknown, index: number, teamId: string): TeamModerationMember | null {
   if (!isRecord(value)) return null;
 
-  const fullName = firstString([value.fullName, value.vardsUzvards, value.pilnsVards, value.name, value.full_name], "");
+  const data = isRecord(value.dati) ? value.dati : value;
+  const fullName = firstString(
+    [value.fullName, value.vardsUzvards, value.pilnsVards, value.name, value.full_name, data.fullName, data.name],
+    ""
+  );
   if (!fullName) return null;
 
   return {
-    key: firstString([value.key, value.id, value.ID, value.userId], `${teamId}-member-${index + 1}`),
+    key: firstString([value.key, value.id, value.ID, value.userId, data.key, data.id], `${teamId}-member-${index + 1}`),
     fullName,
-    role: firstString([value.role, value.loma], "") || undefined,
-    dateOfBirth: firstString([value.dateOfBirth, value.dzimsanasDatums], "") || undefined,
+    role: firstString([value.role, value.loma, data.role, data.loma], "") || undefined,
+    dateOfBirth: firstString([value.dateOfBirth, value.dzimsanasDatums, data.dateOfBirth, data.dzimsanasDatums], "") || undefined,
     educationalInstitution: firstString(
-      [value.educationalInstitution, value.izglitibasIestade, value.school],
+      [value.educationalInstitution, value.izglitibasIestade, value.school, data.educationalInstitution, data.school],
       ""
     ) || undefined,
-    phone: firstString([value.phone, value.phoneNumber, value.telefonanumurs, value.talrunis], "") || undefined,
-    email: firstString([value.email, value.epasts], "") || undefined,
-    classOrYear: firstString([value.classOrYear, value.klaseVaiKurss, value.grade], "") || undefined,
+    phone: firstString([value.phone, value.phoneNumber, value.telefonanumurs, value.talrunis, data.phone, data.phoneNumber], "") || undefined,
+    email: firstString([value.email, value.epasts, data.email, data.epasts], "") || undefined,
+    classOrYear: firstString([value.classOrYear, value.klaseVaiKurss, value.grade, data.classOrYear, data.grade], "") || undefined,
   };
 }
 
@@ -257,21 +263,27 @@ function normalizePendingTeamMemberApplication(
 ): PendingTeamMemberApplication | null {
   if (!isRecord(value)) return null;
 
+  const data = isRecord(value.dati) ? value.dati : value;
   const key = firstString([value.key, value.id, value.ID], `pending-member-${index + 1}`);
-  const fullName = firstString([value.fullName, value.vardsUzvards, value.name], "");
-  const teamName = firstString([value.komandasNosaukums, value.teamName, value.team, value.name], "");
+  const fullName = firstString([value.fullName, value.vardsUzvards, value.name, data.fullName, data.name], "");
+  const pendingTeamId = firstString([value.pendingTeamId, value.teamId, value.komandasId, data.pendingTeamId], "");
+  const teamName = firstString(
+    [value.komandasNosaukums, value.teamName, value.team, data.teamName, data.komandasNosaukums, pendingTeamId],
+    ""
+  );
   if (!key || !fullName || !teamName) return null;
 
   return {
     key,
     fullName,
     teamName,
+    pendingTeamId: pendingTeamId || undefined,
     username: firstString([value.lietotajvards, value.username], ""),
-    role: firstString([value.role, value.loma], "") || undefined,
-    dateOfBirth: firstString([value.dateOfBirth, value.dzimsanasDatums], "") || undefined,
-    educationalInstitution: firstString([value.educationalInstitution, value.school], "") || undefined,
-    phone: firstString([value.telefonanumurs, value.phoneNumber, value.phone], "") || undefined,
-    email: firstString([value.epasts, value.email], "") || undefined,
+    role: firstString([value.role, value.loma, data.role, data.loma], "") || undefined,
+    dateOfBirth: firstString([value.dateOfBirth, value.dzimsanasDatums, data.dateOfBirth, data.dzimsanasDatums], "") || undefined,
+    educationalInstitution: firstString([value.educationalInstitution, value.school, data.educationalInstitution, data.school], "") || undefined,
+    phone: firstString([value.telefonanumurs, value.phoneNumber, value.phone, data.phone, data.phoneNumber], "") || undefined,
+    email: firstString([value.epasts, value.email, data.email, data.epasts], "") || undefined,
   };
 }
 
@@ -348,6 +360,27 @@ function normalizeTeamApplication(value: unknown, index: number): TeamModeration
     comments: firstString([value.comments, value.komentari], "") || undefined,
     howHeardAbout: firstString([value.howHeardAbout, value.kaUzzinaja], "") || undefined,
   };
+}
+
+async function fetchTeamDataByApplicationKey(application: TeamModerationRecord): Promise<TeamModerationRecord> {
+  try {
+    const response = await apiFetch(`${ENDPOINT_TEAM}/${encodeURIComponent(application.id)}`);
+    if (!response.ok) return application;
+
+    const payload: unknown = await response.json();
+    const normalized = normalizeTeamApplication(payload, 0);
+    return normalized
+      ? {
+          ...application,
+          ...normalized,
+          id: normalized.id || application.id,
+          status: application.status || normalized.status,
+          appliedAt: application.appliedAt || normalized.appliedAt,
+        }
+      : application;
+  } catch {
+    return application;
+  }
 }
 
 function localTeamToModerationRecord(value: TeamRecord): TeamModerationRecord {
@@ -683,7 +716,11 @@ const CabinetPage: React.FC = () => {
       status: "registered",
     }));
     const pendingRows = pendingTeamMembers
-      .filter((member) => normalizeTeamName(member.teamName) === teamName)
+      .filter(
+        (member) =>
+          normalizeTeamName(member.teamName) === teamName ||
+          (member.pendingTeamId && member.pendingTeamId === viewingTeam.id)
+      )
       .map<TeamModerationMemberRow>((member) => ({
         key: member.key,
         fullName: member.fullName,
@@ -742,7 +779,8 @@ const CabinetPage: React.FC = () => {
         .map((item, index) => normalizeTeamApplication(item, index))
         .filter((item): item is TeamModerationRecord => item !== null);
 
-      setAllTeams(teams);
+      const detailedTeams = await Promise.all(teams.map(fetchTeamDataByApplicationKey));
+      setAllTeams(detailedTeams);
     } catch (error) {
       setAllTeams(getAllTeams().map(localTeamToModerationRecord));
       message.warning(c("messages.teamsLoadFallback"));
@@ -865,7 +903,7 @@ const CabinetPage: React.FC = () => {
     setAcceptingPendingMemberKey(applicationKey);
     try {
       const response = await apiFetch(
-        `${ENDPOINT_VERIFY_ACCOUNT_APPLICATION}?key=${encodeURIComponent(applicationKey)}`,
+        `${ENDPOINT_VERIFY_ACCOUNT_APPLICATION}/${encodeURIComponent(applicationKey)}`,
         { method: "POST" }
       );
       if (!response.ok) throw new Error(`HTTP ${response.status}`);

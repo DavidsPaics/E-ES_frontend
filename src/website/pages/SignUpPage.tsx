@@ -112,6 +112,24 @@ function responseIndicatesPendingVerification(payload: unknown): boolean {
   );
 }
 
+function generateBase64RawKey(size = 16): string {
+  const bytes = new Uint8Array(size > 0 ? size : 16);
+  crypto.getRandomValues(bytes);
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary).replace(/=+$/g, "");
+}
+
+async function sha512Hex(value: string): Promise<string> {
+  const data = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest("SHA-512", data);
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 function getStoredSignUpDraft(): SignUpDraftValues | null {
   try {
     const stored = localStorage.getItem(SIGNUP_DRAFT_STORAGE_KEY);
@@ -300,17 +318,22 @@ const SignUpPage: React.FC = () => {
         : values.teamId
           ? values.teamRole ?? "participant"
           : "member";
+      const key = generateBase64RawKey();
+      const salt = generateBase64RawKey();
+      const hashedPassword = await sha512Hex(values.password + salt);
       const registerEndpoint = isLeaderVerification
-        ? `${ENDPOINT_AUTH_REGISTER}?uniqueID=${encodeURIComponent(leaderVerificationId)}`
+        ? `${ENDPOINT_AUTH_REGISTER}/${encodeURIComponent(leaderVerificationId)}`
         : ENDPOINT_AUTH_REGISTER;
 
       const response = await fetch(registerEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          key,
           fullName: values.name,
           dateOfBirth: dateOfBirth.format("YYYY-MM-DD"),
-          parole: values.password,
+          parole: hashedPassword,
+          salt,
           lietotajvards: values.username,
           epasts: values.email,
           telefonanumurs: values.phone,

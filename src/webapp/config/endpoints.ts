@@ -11,15 +11,17 @@ export const BASE_URL = env.VITE_API_BASE_URL ?? "https://e-es.lv";
 
 // Auth endpoints
 export const ENDPOINT_AUTH_LOGIN = `${BASE_URL}/api/login`;
-export const ENDPOINT_AUTH_REGISTER = `${BASE_URL}/api/register`;
+export const ENDPOINT_AUTH_REGISTER = `${BASE_URL}/api/register-account`;
 
 // User endpoints
 export const ENDPOINT_USERS = `${BASE_URL}/api/users`;
 export const ENDPOINT_ACCOUNTS = `${BASE_URL}/api/accounts`;
 export const ENDPOINT_ACCOUNT = `${BASE_URL}/api/account`;
-export const ENDPOINT_ACCOUNT_APPLICATIONS = `${BASE_URL}/api/account-applications`;
+export const ENDPOINT_UNVERIFIED_ACCOUNTS = `${BASE_URL}/api/unverified-accounts`;
+export const ENDPOINT_ACCOUNT_APPLICATIONS = ENDPOINT_UNVERIFIED_ACCOUNTS;
 export const ENDPOINT_ACCOUNT_VERIFICATION_INFO = `${BASE_URL}/api/account-verification-info`;
-export const ENDPOINT_VERIFY_ACCOUNT_APPLICATION = `${BASE_URL}/api/verify-account-application`;
+export const ENDPOINT_VERIFY_ACCOUNT = `${BASE_URL}/api/verify-account`;
+export const ENDPOINT_VERIFY_ACCOUNT_APPLICATION = ENDPOINT_VERIFY_ACCOUNT;
 export const ENDPOINT_ADMIN_ACCOUNTS = `${BASE_URL}/api/admin-accounts`;
 
 // Competitor endpoints
@@ -49,9 +51,11 @@ export const ENDPOINT_ADMIN_SETTINGS = `${BASE_URL}/api/settings`;
 export const ENDPOINT_ADMIN_DELETE = `${BASE_URL}/api/delete`;
 
 // Applications endpoint (public — used by website)
-export const ENDPOINT_TEAMS = `${BASE_URL}/api/teams`;
-export const ENDPOINT_TEAM_APPLICATION = `${BASE_URL}/api/team-applications`;
+export const ENDPOINT_TEAM_APPLICATIONS = `${BASE_URL}/api/team-applications`;
+export const ENDPOINT_TEAMS = ENDPOINT_TEAM_APPLICATIONS;
+export const ENDPOINT_TEAM_APPLICATION = `${BASE_URL}/api/team-application`;
 export const ENDPOINT_TEAM_APPLICATION_UPDATE = `${BASE_URL}/api/team`;
+export const ENDPOINT_TEAM = `${BASE_URL}/api/team`;
 export const ENDPOINT_APPLICATIONS = ENDPOINT_TEAMS;
 
 // News endpoints (public website + admin CRUD)

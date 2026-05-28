@@ -21,7 +21,11 @@ import {
 } from "@ant-design/icons";
 import "@ant-design/v5-patch-for-react-19";
 import { useTranslation } from "react-i18next";
-import { ENDPOINT_TEAM_APPLICATION_UPDATE, ENDPOINT_TEAMS } from "@/webapp/config/endpoints";
+import {
+  ENDPOINT_ACCOUNTS,
+  ENDPOINT_TEAM,
+  ENDPOINT_TEAM_APPLICATIONS,
+} from "@/webapp/config/endpoints";
 import { apiFetch } from "@/webapp/utils/api";
 import { formatDisplayDate, formatDisplayTime } from "@/utils/dateFormat";
 
@@ -54,6 +58,28 @@ interface ApplicationRecord {
   comments?: string;
   howHeardAbout?: string;
   members: TeamMemberView[];
+}
+
+interface AccountOption {
+  key: string;
+  username: string;
+  fullName: string;
+  email?: string;
+  phone?: string;
+  role?: string;
+}
+
+interface TeamAcceptFormValues {
+  teamName: string;
+  ageGroup?: string;
+  institution?: string;
+  cityOrRegion?: string;
+  responsibleName?: string;
+  responsiblePhone?: string;
+  responsibleEmail?: string;
+  responsibleStatus?: string;
+  avatar?: string;
+  carId?: string;
 }
 
 const { Text } = Typography;
@@ -158,6 +184,33 @@ function normalizeApplication(rawValue: unknown, index: number): ApplicationReco
       typeof rawValue.howHeardAbout === "string" ? rawValue.howHeardAbout : undefined,
     members,
   };
+}
+
+function normalizeAccountOption(rawValue: unknown, index: number): AccountOption | null {
+  if (!isRecord(rawValue)) return null;
+  const data = isRecord(rawValue.dati) ? rawValue.dati : rawValue;
+  const key = firstNonEmpty([rawValue.key, rawValue.id, rawValue.ID, data.key, data.id], `account-${index + 1}`);
+  const username = firstNonEmpty([rawValue.lietotajvards, rawValue.username, rawValue.epasts], key);
+  const fullName = firstNonEmpty([data.fullName, data.name, rawValue.fullName, rawValue.name], username);
+
+  return {
+    key,
+    username,
+    fullName,
+    email: firstNonEmpty([rawValue.epasts, rawValue.email, data.email], ""),
+    phone: firstNonEmpty([rawValue.telefonanumurs, rawValue.phoneNumber, data.phone, data.phoneNumber], ""),
+    role: firstNonEmpty([data.role, rawValue.role], ""),
+  };
+}
+
+function getArrayPayloadItems(payload: unknown): unknown[] {
+  if (Array.isArray(payload)) return payload;
+  if (!isRecord(payload)) return [];
+  for (const key of ["data", "accounts", "teams", "applications"]) {
+    const value = payload[key];
+    if (Array.isArray(value)) return value;
+  }
+  return [];
 }
 
 function buildExampleApplications(): ApplicationRecord[] {
@@ -347,6 +400,11 @@ const ApplicationReviewPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<"all" | ApplicationStatus>("all");
   const [selected, setSelected] = useState<ApplicationRecord | null>(null);
   const [updatingKey, setUpdatingKey] = useState<string | null>(null);
+  const [acceptingApplication, setAcceptingApplication] = useState<ApplicationRecord | null>(null);
+  const [teamAcceptValues, setTeamAcceptValues] = useState<TeamAcceptFormValues | null>(null);
+  const [accounts, setAccounts] = useState<AccountOption[]>([]);
+  const [selectedAccountKeys, setSelectedAccountKeys] = useState<React.Key[]>([]);
+  const [accountsLoading, setAccountsLoading] = useState(false);
 
   const statusConfig: Record<ApplicationStatus, { color: string; label: string; icon: React.ReactNode }> = {
     accepted: {
@@ -384,7 +442,7 @@ const ApplicationReviewPage: React.FC = () => {
   const fetchApplications = async () => {
     setLoading(true);
     try {
-      const response = await apiFetch(ENDPOINT_TEAMS);
+      const response = await apiFetch(ENDPOINT_TEAM_APPLICATIONS);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
       const payload: unknown = await response.json();
@@ -421,8 +479,27 @@ const ApplicationReviewPage: React.FC = () => {
     }
   };
 
+  const fetchAccounts = async () => {
+    setAccountsLoading(true);
+    try {
+      const response = await apiFetch(ENDPOINT_ACCOUNTS);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const payload: unknown = await response.json();
+      const normalized = getArrayPayloadItems(payload)
+        .map((entry, index) => normalizeAccountOption(entry, index))
+        .filter((entry): entry is AccountOption => entry !== null);
+      setAccounts(normalized);
+    } catch {
+      setAccounts([]);
+      message.warning(t("webapp.applicationReview.accountsLoadFallback", { defaultValue: "Could not load accounts." }));
+    } finally {
+      setAccountsLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchApplications();
+    fetchAccounts();
   }, []);
 
   const filtered = useMemo(() => {
@@ -438,49 +515,84 @@ const ApplicationReviewPage: React.FC = () => {
     });
   }, [applications, search, statusFilter]);
 
-  const persistStatus = async (record: ApplicationRecord, status: ApplicationStatus) => {
-    const apiStatus = status === "in_process" ? "pending" : status;
-    const payload = JSON.stringify({
-      key: record.id,
-      status: apiStatus,
+  const openAcceptModal = (record: ApplicationRecord) => {
+    const matchingAccountKeys = accounts
+      .filter((account) =>
+        record.members.some(
+          (member) =>
+            member.email &&
+            account.email &&
+            member.email.toLowerCase() === account.email.toLowerCase()
+        )
+      )
+      .map((account) => account.key);
+
+    setAcceptingApplication(record);
+    setTeamAcceptValues({
       teamName: record.teamName,
-      appliedAt: record.appliedAtRaw,
+      ageGroup: record.ageGroup,
+      institution: record.school,
+      cityOrRegion: record.cityOrRegion,
+      responsibleName: record.supervisor,
+      responsibleEmail: record.responsibleEmail,
+      responsiblePhone: record.responsiblePhone,
     });
-
-    const requests: Array<{ url: string; method: "PATCH" | "POST" }> = [
-      { url: ENDPOINT_TEAM_APPLICATION_UPDATE, method: "PATCH" },
-      { url: `${ENDPOINT_TEAM_APPLICATION_UPDATE}/${encodeURIComponent(record.id)}`, method: "POST" },
-    ];
-    for (const request of requests) {
-      const response = await apiFetch(request.url, {
-        method: request.method,
-        headers: { "Content-Type": "application/json" },
-        body: payload,
-      });
-      if (response.ok) return;
-      if (response.status !== 404 && response.status !== 405) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-    }
-
-    throw new Error("No compatible update endpoint");
+    setSelectedAccountKeys(matchingAccountKeys);
   };
 
-  const handleStatusChange = async (record: ApplicationRecord, status: ApplicationStatus) => {
-    const previousStatus = record.status;
-    const updateKey = `${record.id}:${status}`;
-    setUpdatingKey(updateKey);
-    setApplications((prev) => prev.map((item) => (item.id === record.id ? { ...item, status } : item)));
-    setSelected((prev) => (prev && prev.id === record.id ? { ...prev, status } : prev));
+  const handleAcceptTeamApplication = async () => {
+    if (!acceptingApplication || !teamAcceptValues) return;
 
+    setUpdatingKey(`${acceptingApplication.id}:accepted`);
     try {
-      await persistStatus(record, status);
+      const selectedAccounts = accounts.filter((account) => selectedAccountKeys.includes(account.key));
+      const payload = {
+        key: acceptingApplication.id,
+        teamName: teamAcceptValues.teamName,
+        members: selectedAccounts.map((account) => ({
+          dati: {
+            key: account.key,
+            fullName: account.fullName,
+            role: account.role,
+            email: account.email,
+          },
+          lietotajvards: account.username,
+          epasts: account.email,
+          telefonanumurs: account.phone,
+        })),
+        ageGroup: teamAcceptValues.ageGroup,
+        institution: teamAcceptValues.institution,
+        cityOrRegion: teamAcceptValues.cityOrRegion,
+        responsiblePerson: {
+          fullName: teamAcceptValues.responsibleName,
+          phone: teamAcceptValues.responsiblePhone,
+          email: teamAcceptValues.responsibleEmail,
+          status: teamAcceptValues.responsibleStatus,
+        },
+        avatar: teamAcceptValues.avatar,
+        carId: teamAcceptValues.carId,
+      };
+
+      const response = await apiFetch(`${ENDPOINT_TEAM}/${encodeURIComponent(acceptingApplication.id)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      setApplications((prev) =>
+        prev.map((item) =>
+          item.id === acceptingApplication.id ? { ...item, status: "accepted" } : item
+        )
+      );
+      setSelected((prev) =>
+        prev && prev.id === acceptingApplication.id ? { ...prev, status: "accepted" } : prev
+      );
+      setAcceptingApplication(null);
+      setTeamAcceptValues(null);
+      setSelectedAccountKeys([]);
       message.success(t("webapp.applicationReview.updateOk"));
     } catch {
-      setApplications((prev) =>
-        prev.map((item) => (item.id === record.id ? { ...item, status: previousStatus } : item))
-      );
-      setSelected((prev) => (prev && prev.id === record.id ? { ...prev, status: previousStatus } : prev));
       message.error(t("webapp.applicationReview.updateError"));
     } finally {
       setUpdatingKey(null);
@@ -550,30 +662,11 @@ const ApplicationReviewPage: React.FC = () => {
             <Button
               size="small"
               type={record.status === "accepted" ? "primary" : "default"}
-              onClick={() => handleStatusChange(record, "accepted")}
+              onClick={() => openAcceptModal(record)}
               loading={updatingKey === `${record.id}:accepted`}
               disabled={rowIsUpdating && updatingKey !== `${record.id}:accepted`}
             >
               {t("webapp.applicationReview.accept")}
-            </Button>
-            <Button
-              size="small"
-              danger={record.status !== "denied"}
-              type={record.status === "denied" ? "primary" : "default"}
-              onClick={() => handleStatusChange(record, "denied")}
-              loading={updatingKey === `${record.id}:denied`}
-              disabled={rowIsUpdating && updatingKey !== `${record.id}:denied`}
-            >
-              {t("webapp.applicationReview.deny")}
-            </Button>
-            <Button
-              size="small"
-              type={record.status === "in_process" ? "primary" : "default"}
-              onClick={() => handleStatusChange(record, "in_process")}
-              loading={updatingKey === `${record.id}:in_process`}
-              disabled={rowIsUpdating && updatingKey !== `${record.id}:in_process`}
-            >
-              {t("webapp.applicationReview.reset")}
             </Button>
           </Space>
         );
@@ -737,6 +830,138 @@ const ApplicationReviewPage: React.FC = () => {
                 {selected.comments || "-"}
               </Descriptions.Item>
             </Descriptions>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={acceptingApplication !== null}
+        onCancel={() => {
+          setAcceptingApplication(null);
+          setTeamAcceptValues(null);
+          setSelectedAccountKeys([]);
+        }}
+        onOk={handleAcceptTeamApplication}
+        okText={t("webapp.applicationReview.accept")}
+        confirmLoading={updatingKey === `${acceptingApplication?.id}:accepted`}
+        width={1000}
+        title={t("webapp.applicationReview.accept")}
+      >
+        {acceptingApplication && teamAcceptValues && (
+          <div className="space-y-4">
+            <Descriptions bordered size="small" column={1}>
+              <Descriptions.Item label={t("website.apply.form.teamName")}>
+                <Input
+                  value={teamAcceptValues.teamName}
+                  onChange={(event) =>
+                    setTeamAcceptValues((prev) =>
+                      prev ? { ...prev, teamName: event.target.value } : prev
+                    )
+                  }
+                />
+              </Descriptions.Item>
+              <Descriptions.Item label={t("website.apply.form.ageGroup")}>
+                <Input
+                  value={teamAcceptValues.ageGroup}
+                  onChange={(event) =>
+                    setTeamAcceptValues((prev) =>
+                      prev ? { ...prev, ageGroup: event.target.value } : prev
+                    )
+                  }
+                />
+              </Descriptions.Item>
+              <Descriptions.Item label={t("website.apply.form.institution")}>
+                <Input
+                  value={teamAcceptValues.institution}
+                  onChange={(event) =>
+                    setTeamAcceptValues((prev) =>
+                      prev ? { ...prev, institution: event.target.value } : prev
+                    )
+                  }
+                />
+              </Descriptions.Item>
+              <Descriptions.Item label={t("website.apply.form.cityOrRegion")}>
+                <Input
+                  value={teamAcceptValues.cityOrRegion}
+                  onChange={(event) =>
+                    setTeamAcceptValues((prev) =>
+                      prev ? { ...prev, cityOrRegion: event.target.value } : prev
+                    )
+                  }
+                />
+              </Descriptions.Item>
+              <Descriptions.Item label={t("website.apply.colSupervisor")}>
+                <Input
+                  value={teamAcceptValues.responsibleName}
+                  onChange={(event) =>
+                    setTeamAcceptValues((prev) =>
+                      prev ? { ...prev, responsibleName: event.target.value } : prev
+                    )
+                  }
+                />
+              </Descriptions.Item>
+              <Descriptions.Item label={t("website.apply.form.responsiblePhone")}>
+                <Input
+                  value={teamAcceptValues.responsiblePhone}
+                  onChange={(event) =>
+                    setTeamAcceptValues((prev) =>
+                      prev ? { ...prev, responsiblePhone: event.target.value } : prev
+                    )
+                  }
+                />
+              </Descriptions.Item>
+              <Descriptions.Item label={t("website.apply.form.responsibleEmail")}>
+                <Input
+                  value={teamAcceptValues.responsibleEmail}
+                  onChange={(event) =>
+                    setTeamAcceptValues((prev) =>
+                      prev ? { ...prev, responsibleEmail: event.target.value } : prev
+                    )
+                  }
+                />
+              </Descriptions.Item>
+            </Descriptions>
+
+            <div>
+              <h3 className="font-semibold mb-2">
+                {t("webapp.applicationReview.accounts", { defaultValue: "Accounts" })}
+              </h3>
+              <Table<AccountOption>
+                dataSource={accounts}
+                rowKey="key"
+                size="small"
+                loading={accountsLoading}
+                pagination={accounts.length > 8 ? { pageSize: 8 } : false}
+                rowSelection={{
+                  selectedRowKeys: selectedAccountKeys,
+                  onChange: setSelectedAccountKeys,
+                }}
+                columns={[
+                  {
+                    title: t("website.auth.fullName"),
+                    dataIndex: "fullName",
+                    key: "fullName",
+                  },
+                  {
+                    title: t("website.auth.username"),
+                    dataIndex: "username",
+                    key: "username",
+                  },
+                  {
+                    title: t("website.auth.email"),
+                    dataIndex: "email",
+                    key: "email",
+                    render: (value: string | undefined) => value || "-",
+                  },
+                  {
+                    title: t("website.apply.form.memberRole"),
+                    dataIndex: "role",
+                    key: "role",
+                    render: (value: string | undefined) => getRoleLabel(value),
+                  },
+                ]}
+              />
+            </div>
           </div>
         )}
       </Modal>
