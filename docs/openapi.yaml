@@ -17,6 +17,8 @@ servers:
 tags:
   - name: Test
     description: Iekšējie testa galapunkti
+  - name: MQTT
+    description: MQTT zinu sutisana un logu parskats
   - name: Auth
     description: Autentifikācija un sesijas informācija
   - name: Accounts
@@ -70,7 +72,7 @@ paths:
   
   /api/mqtt-logs/{limit}:
     get:
-      tags: [Test]
+      tags: [MQTT]
       summary: Iegūt pēdējos MQTT logus
       x-implemented: true
       parameters:
@@ -83,7 +85,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/MQTTMessage'
+                  $ref: '#/components/schemas/MQTTLogEntry'
         '500':
           description: Iekšējā servera kļūme vai datubāzes piekļuves kļūme
           content:
@@ -93,7 +95,7 @@ paths:
   
   /api/mqtt-message:
     post:
-      tags: [Test]
+      tags: [MQTT]
       summary: Iesniegt MQTT ziņu
       x-implemented: true
       requestBody:
@@ -328,6 +330,33 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+    delete:
+      tags: [Accounts]
+      summary: Dzest vai noraidit kontu pec ta atslegas
+      description: Superadministrators izmanto so darbibu neverificeta konta noraidisanai.
+      x-implemented: true
+      parameters:
+        - $ref: '#/components/parameters/keyParam'
+      responses:
+        '200':
+          description: Konts veiksmigi dzests vai noraidits
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+        '403':
+          description: Nav tiesibu dzest vai noraidit kontu
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Konts pec noraditas atslegas netika atrasts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/admin-accounts:
     get:
       tags: [Admin]
@@ -369,6 +398,49 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+
+  /api/settings:
+    get:
+      tags: [Admin]
+      summary: Iegut globalos administratora iestatijumus
+      x-implemented: true
+      responses:
+        '200':
+          description: Globalie iestatijumi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminSettings'
+    post:
+      tags: [Admin]
+      summary: Saglabat globalos administratora iestatijumus
+      x-implemented: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminSettings'
+      responses:
+        '200':
+          description: Iestatijumi saglabati
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+
+  /api/delete:
+    delete:
+      tags: [Admin]
+      summary: Atiestatit datubazi
+      x-implemented: true
+      responses:
+        '200':
+          description: Datubaze atiestatita
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
 
   /api/team-applications:
     get:
@@ -452,6 +524,40 @@ paths:
       responses:
         '200':
           description: Komandas dati veiksmīgi saglabāti
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+
+  /api/cars:
+    get:
+      tags: [Races]
+      summary: Iegut sacensibu auto/dalibnieku sarakstu
+      x-implemented: true
+      responses:
+        '200':
+          description: Auto saraksts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Competitor'
+    post:
+      tags: [Races]
+      summary: Saglabat sacensibu auto/dalibnieku sarakstu
+      x-implemented: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/Competitor'
+      responses:
+        '200':
+          description: Auto dati saglabati
           content:
             application/json:
               schema:
@@ -761,6 +867,9 @@ components:
     
     MQTTMessage:
       type: object
+      required:
+        - topic
+        - payload
       properties:
         topic:
           type: string
@@ -768,6 +877,31 @@ components:
         payload:
           type: string
           example: "This is a test MQTT message"
+
+    MQTTLogEntry:
+      allOf:
+        - $ref: '#/components/schemas/MQTTMessage'
+        - type: object
+          properties:
+            key:
+              type: string
+            id:
+              type: string
+            timestamp:
+              type: string
+              format: date-time
+            createdAt:
+              type: string
+              format: date-time
+            receivedAt:
+              type: string
+              format: date-time
+            qos:
+              type: integer
+              minimum: 0
+              maximum: 2
+            retained:
+              type: boolean
 
     BilingualText:
       type: object
@@ -863,10 +997,29 @@ components:
         email:
           type: string
           format: email
+        registered:
+          type: boolean
 
     AccountApplication:
       type: object
+      required:
+        - key
+        - fullName
+        - dateOfBirth
+        - parole
+        - salt
+        - lietotajvards
+        - epasts
+        - telefonanumurs
       properties:
+        key:
+          type: string
+          example: "E81sMOhR+oWMwNKMpmlqcg"
+        fullName:
+          type: string
+        dateOfBirth:
+          type: string
+          format: date
         parole:
           type: string
         salt:
@@ -886,6 +1039,9 @@ components:
     Account:
       type: object
       properties:
+        key:
+          type: string
+          description: Konta reala atslega. Ja konts satur dati.key, tai jasakrit ar so vertibu.
         dati:
           $ref: '#/components/schemas/TeamMember'
         parole:
@@ -901,12 +1057,19 @@ components:
           type: string
         pendingTeamId:
           type: string
+        pendingTeamID:
+          type: string
+          deprecated: true
+          description: Atpakalsaderibas alias laukam pendingTeamId; klientiem jalasa abi nosaukumi.
         registered:
           type: boolean
         educationalInstitution:
           type: string
         classOrYear:
           type: string
+        profilePicture:
+          type: string
+          description: Profila attels top-level lauka; nav dati.profilePicture.
 
     AdminAccount:
       type: object
@@ -921,6 +1084,16 @@ components:
           type: string
         superadmin:
           type: boolean
+
+    AdminSettings:
+      type: object
+      properties:
+        PowerCoef:
+          type: number
+          example: 1.5
+        MaxSpd:
+          type: number
+          example: 60
 
     ResponsiblePerson:
       type: object
@@ -938,9 +1111,13 @@ components:
     RegistrationFormData:
       type: object
       properties:
+        key:
+          type: string
         id:
           type: string
         teamName:
+          type: string
+        komandasNosaukums:
           type: string
         ageGroup:
           type: string
@@ -983,6 +1160,31 @@ components:
         category:
           type: string
 
+    Competitor:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "89"
+        username:
+          type: string
+        U:
+          type: number
+          description: Spriegums
+        I:
+          type: number
+          description: Strava
+        m:
+          type: number
+          description: Masa
+        ageGroup:
+          type: string
+        avatar:
+          type: string
+        finishedAt:
+          type: string
+          format: date-time
+
     TeamData:
       type: object
       properties:
@@ -1008,6 +1210,8 @@ components:
           type: string
         carData:
           $ref: '#/components/schemas/Car'
+        status:
+          type: string
 
     AccountVerificationCriteria:
       type: object

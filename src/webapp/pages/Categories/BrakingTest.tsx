@@ -5,7 +5,7 @@ import { ENDPOINT_COMPETITORS, ENDPOINT_RESULTS } from "@/webapp/config/endpoint
 import { apiFetch } from "@/webapp/utils/api";
 import { fakeCategoryCompetitors } from "@/webapp/data/fakeData";
 import { useTranslation } from "react-i18next";
-import { getTeam, getValidity, toNumber } from "./resultsTableUtils";
+import { getTeam, getValidity, normalizeCategoryCompetitors, toNumber } from "./resultsTableUtils";
 
 type Competitor = {
   id: number;
@@ -48,7 +48,7 @@ const BrakingTest: React.FC = () => {
       try {
         const res = await apiFetch(ENDPOINT_COMPETITORS);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        source = (await res.json()) as Competitor[];
+        source = normalizeCategoryCompetitors(await res.json()) as Competitor[];
       } catch {
         source = fakeCategoryCompetitors as unknown as Competitor[];
       }

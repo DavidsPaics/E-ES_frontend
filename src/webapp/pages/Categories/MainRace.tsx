@@ -19,6 +19,7 @@ import {
   getPenalty,
   getTeam,
   getTimeSpent,
+  normalizeCategoryCompetitors,
   timeToSeconds,
   toNumber,
 } from "./resultsTableUtils";
@@ -46,7 +47,7 @@ const MainRace: React.FC = () => {
     try {
       const res = await apiFetch(ENDPOINT_COMPETITORS);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setCompetitors((await res.json()) as Competitor[]);
+      setCompetitors(normalizeCategoryCompetitors(await res.json()) as Competitor[]);
     } catch (err: any) {
       // Use fake data
       console.log("Using fake competitors for MainRace");

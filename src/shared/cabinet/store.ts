@@ -46,7 +46,19 @@ export interface UserRecord {
   profile: UserProfile;
 }
 
-export type PublicUserRecord = Omit<UserRecord, "password">;
+export interface AccountApiMeta {
+  parole?: string;
+  salt?: string;
+  pendingTeamId?: string;
+  registered?: boolean;
+  profilePicture?: string;
+  educationalInstitution?: string;
+  classOrYear?: string;
+}
+
+export type PublicUserRecord = Omit<UserRecord, "password"> & {
+  account?: AccountApiMeta;
+};
 
 export interface UpdateUserInput {
   username?: string;

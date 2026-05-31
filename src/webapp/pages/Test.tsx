@@ -53,6 +53,7 @@ export const WSTestPage: React.FC = () => {
         marginTop: 10,
         padding: 10,
         background: '#f9f9f9',
+        color: '#0A306D',
         height: '60vh',
         overflowY: 'auto',
         whiteSpace: 'pre-wrap',

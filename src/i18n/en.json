@@ -582,6 +582,7 @@
         "copy": "Copy",
         "close": "Close",
         "accept": "Accept",
+        "decline": "Decline",
         "remove": "Remove",
         "delete": "Delete",
         "kick": "Kick"
@@ -604,7 +605,8 @@
         "leaveTeam": "Leave current team?",
         "deleteAccount": "Delete your account permanently?",
         "deleteTeam": "Delete team \"{{name}}\"?",
-        "kickMember": "Kick this member from team?"
+        "kickMember": "Kick this member from team?",
+        "declinePendingMember": "Decline this unverified account?"
       },
       "messages": {
         "noSession": "No active user session. Please log in again.",
@@ -619,6 +621,8 @@
         "leaderLinkCopyFailed": "Could not copy leader verification link.",
         "pendingMemberAccepted": "Pending team member accepted.",
         "pendingMemberAcceptFailed": "Failed to accept pending team member.",
+        "pendingMemberDeclined": "Unverified account declined.",
+        "pendingMemberDeclineFailed": "Failed to decline unverified account.",
         "imageReadFailed": "Failed to read image files.",
         "documentReadFailed": "Failed to read document files.",
         "profilePictureReadFailed": "Failed to read profile picture.",

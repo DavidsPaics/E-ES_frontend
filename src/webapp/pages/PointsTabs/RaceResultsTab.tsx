@@ -3,18 +3,24 @@ import { Table, Select, Spin, Avatar, InputNumber, Button, Space, message } from
 import type { ColumnType } from "antd/es/table";
 import { UpOutlined, DownOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
-import { ENDPOINT_RACES, ENDPOINT_RESULTS, ENDPOINT_POINTS } from "@/webapp/config/endpoints";
+import { ENDPOINT_RACE_RESULTS_ALL, ENDPOINT_POINTS } from "@/webapp/config/endpoints";
 import { apiFetch } from "@/webapp/utils/api";
-import { fakeRaces, fakePointsResults } from "@/webapp/data/fakeData";
-import type { RawLapForList, RawResult, TableRow } from "./types";
+import {
+  RACE_OPTIONS,
+  formatDuration,
+  getRaceLabel,
+  normalizeRaceResults,
+  type RaceKey,
+  type RaceResultRow,
+} from "@/webapp/utils/raceResults";
+import type { TableRow } from "./types";
 
 const { Option } = Select;
 
 const RaceResultsTab: React.FC = () => {
   const { t } = useTranslation();
 
-  const [raceNames, setRaceNames] = useState<string[]>([]);
-  const [selectedRace, setSelectedRace] = useState<string | null>(null);
+  const [selectedRace, setSelectedRace] = useState<RaceKey | null>(null);
   const [tableData, setTableData] = useState<TableRow[]>([]);
   const [loadingResults, setLoadingResults] = useState(false);
 
@@ -26,68 +32,48 @@ const RaceResultsTab: React.FC = () => {
   const [pointsMap, setPointsMap] = useState<Record<number, number>>({});
   const [coefficient, setCoefficient] = useState<number>(1);
 
-  // Fetch races
-  useEffect(() => {
-    const fetchAllRaces = async () => {
-      try {
-        const res = await apiFetch(ENDPOINT_RACES);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const raw: RawLapForList[] = (await res.json()) as RawLapForList[];
-        const unique = Array.from(new Set(raw.map((lap) => lap.RaceName)));
-        setRaceNames(unique);
-      } catch {
-        console.log("Using fake races for Points");
-        const unique = Array.from(new Set(fakeRaces.map((lap) => lap.RaceName)));
-        setRaceNames(unique);
-      }
-    };
-    fetchAllRaces();
-  }, []);
+  const mapResults = (raw: RaceResultRow[]): TableRow[] =>
+    raw.map((r) => ({
+      key: r.key,
+      id: r.id,
+      username: r.team,
+      avatar: "",
+      lap: Number(r.attemptNr || 1),
+      usedEnergy: Number(r.usedEnergy || 0),
+      efficiency: Number(r.efficiency || 0),
+      shellEfficiency: Number(r.shellEfficiency || 0),
+      avgPower: 0,
+      avgSpeed: Number(r.averageSpeed || 0),
+      elapsedTime: formatDuration(r.totalTime || r.usedTime),
+    }));
 
-  // Fetch results when race changes
   useEffect(() => {
-    if (!selectedRace) { setTableData([]); return; }
     const fetchResults = async () => {
       setLoadingResults(true);
       try {
-        const url = `${ENDPOINT_RESULTS}/${encodeURIComponent(selectedRace)}`;
-        const res = await apiFetch(url);
+        const res = await apiFetch(ENDPOINT_RACE_RESULTS_ALL);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const rawResults: RawResult[] = (await res.json()) as RawResult[];
-        setTableData(mapResults(rawResults));
+        const allResults = normalizeRaceResults(await res.json());
+        setTableData(selectedRace ? mapResults(allResults.filter((row) => row.raceName === selectedRace)) : []);
         setPointsMap({});
         setMetricSortOrder(null);
-      } catch {
-        console.log("Using fake results for Points");
-        const fakeResults = fakePointsResults.filter(r => r.RaceName === selectedRace);
-        setTableData(mapResults(fakeResults));
+      } catch (err: any) {
+        message.error("Failed to load race results: " + err.message);
+        setTableData([]);
         setPointsMap({});
         setMetricSortOrder(null);
       } finally {
         setLoadingResults(false);
       }
     };
+    if (!selectedRace) { setTableData([]); return; }
     fetchResults();
   }, [selectedRace]);
-
-  const mapResults = (raw: RawResult[]): TableRow[] =>
-    raw.map((r) => ({
-      key: `${r.ID}-${r.Lap}`,
-      id: r.ID,
-      username: r.Username,
-      avatar: r.avatar,
-      lap: r.Lap,
-      usedEnergy: r["Used energy"],
-      efficiency: r.Efficiency,
-      shellEfficiency: r.Shellefficiency,
-      avgPower: r["Average power"],
-      avgSpeed: r["Average speed"],
-      elapsedTime: r["Elapsed time"],
-    }));
 
   // ─── Sorting / aggregation helpers ──────────────────
   const parseTime = (timeStr: string) => {
     const parts = timeStr.split(":");
+    if (parts.length === 2) return parseInt(parts[0], 10) * 60 + parseFloat(parts[1]);
     if (parts.length !== 3) return 0;
     return parseInt(parts[0], 10) * 3600 + parseInt(parts[1], 10) * 60 + parseFloat(parts[2]);
   };
@@ -264,10 +250,11 @@ const RaceResultsTab: React.FC = () => {
       <h2 className="text-white text-xl font-semibold">{t("points.selectRace")}</h2>
 
       <Select placeholder={t("points.chooseRace")} style={{ width: 300 }}
-        value={selectedRace || undefined} onChange={(val: string) => setSelectedRace(val)}
-        loading={raceNames.length === 0}
+        value={selectedRace || undefined} onChange={(val: RaceKey) => setSelectedRace(val)}
       >
-        {raceNames.map((rn) => (<Option key={rn} value={rn}>{rn}</Option>))}
+        {RACE_OPTIONS.map((race) => (
+          <Option key={race.value} value={race.value}>{getRaceLabel(race.value)}</Option>
+        ))}
       </Select>
 
       {selectedRace && (

@@ -9,19 +9,25 @@ import {
   Input,
   InputNumber,
   Form,
+  Select,
   message,
   Avatar,
   Dropdown,
   type MenuProps,
 } from "antd";
 import '@ant-design/v5-patch-for-react-19';
-import { ENDPOINT_COMPETITORS, ENDPOINT_ADMIN_SETTINGS, ENDPOINT_ADMIN_DELETE } from "@/webapp/config/endpoints";
+import {
+  ENDPOINT_COMPETITORS,
+  ENDPOINT_ADMIN_SETTINGS,
+  ENDPOINT_ADMIN_DELETE,
+  ENDPOINT_TEAM_APPLICATIONS,
+} from "@/webapp/config/endpoints";
 import { apiFetch } from "@/webapp/utils/api";
 import { fakeCompetitors, fakeAdminSettings } from "@/webapp/data/fakeData";
 import { useTranslation } from 'react-i18next';
 
 type CompetitorBase = {
-  id: string;
+  id: number;
   username: string;
   U: number;
   I: number;
@@ -30,10 +36,99 @@ type CompetitorBase = {
   avatar?: string;
 };
 type Competitor = CompetitorBase & { finishedAt?: string };
+type TeamOption = {
+  value: string;
+  label: string;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function firstNonEmpty(values: unknown[], fallback = ""): string {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim().length > 0) return value.trim();
+  }
+  return fallback;
+}
+
+function firstNumber(values: unknown[], fallback = 0): number {
+  for (const value of values) {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim()) {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+  return fallback;
+}
+
+function getArrayPayloadItems(payload: unknown): unknown[] {
+  if (Array.isArray(payload)) return payload;
+  if (!isRecord(payload)) return [];
+
+  for (const key of ["data", "teams", "applications", "teamApplications", "cars", "competitors"]) {
+    const value = payload[key];
+    if (Array.isArray(value)) return value;
+  }
+
+  return [];
+}
+
+function normalizeTeamOption(value: unknown): TeamOption | null {
+  if (!isRecord(value)) return null;
+  const data = isRecord(value.dati) ? value.dati : value;
+
+  const teamName = firstNonEmpty([
+    value.teamName,
+    value.komandasNosaukums,
+    value.team,
+    value.name,
+    isRecord(value.team) ? value.team.name : undefined,
+    data.teamName,
+    data.komandasNosaukums,
+    data.name,
+  ]);
+  if (!teamName) return null;
+
+  return {
+    value: teamName,
+    label: teamName,
+  };
+}
+
+function normalizeCompetitor(value: unknown, index: number): Competitor | null {
+  if (!isRecord(value)) return null;
+
+  const id = firstNumber([value.id, value.ID, value.car_id, value.carId], index + 1);
+  const username = firstNonEmpty(
+    [value.username, value.Username, value.teamName, value.team_name, value.team],
+    ""
+  );
+  if (!username) return null;
+
+  return {
+    id,
+    username,
+    U: typeof value.U === "number" ? value.U : 0,
+    I: typeof value.I === "number" ? value.I : 0,
+    m: typeof value.m === "number" ? value.m : 0,
+    ageGroup: firstNonEmpty([value.ageGroup, value.age_group], ""),
+    avatar: typeof value.avatar === "string" ? value.avatar : undefined,
+  };
+}
+
+function normalizeCompetitorsPayload(payload: unknown): Competitor[] {
+  return getArrayPayloadItems(payload)
+    .map(normalizeCompetitor)
+    .filter((item): item is Competitor => item !== null);
+}
 
 const AdminPanel: React.FC = () => {
   const { t } = useTranslation();
   const [competitors, setCompetitors] = useState<Competitor[]>([]);
+  const [teamOptions, setTeamOptions] = useState<TeamOption[]>([]);
+  const [teamsLoading, setTeamsLoading] = useState(false);
   const [addVisible, setAddVisible] = useState(false);
   const [addForm] = Form.useForm<CompetitorBase>();
 
@@ -43,12 +138,25 @@ const AdminPanel: React.FC = () => {
 
   const [powerCoef, setPowerCoef] = useState<number>(0);
   const [maxSpd, setMaxSpd] = useState<number>(0);
+  const [fullRaceLength, setFullRaceLength] = useState<number>(0);
+  const [dragRaceLength, setDragRaceLength] = useState<number>(0);
+  const validTeamNames = new Set(teamOptions.map((option) => option.value.toLowerCase()));
+
+  const validateTeamName = (_: unknown, value?: string) => {
+    if (!value || !value.trim()) {
+      return Promise.reject(new Error("Please select a team name"));
+    }
+    if (!validTeamNames.has(value.trim().toLowerCase())) {
+      return Promise.reject(new Error("Team name must match an existing team application"));
+    }
+    return Promise.resolve();
+  };
 
   const fetchCompetitors = async () => {
     try {
       const res = await apiFetch(ENDPOINT_COMPETITORS);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setCompetitors((await res.json()) as Competitor[]);
+      setCompetitors(normalizeCompetitorsPayload(await res.json()));
     } catch (err: any) {
       // Use fake data on error
       console.log("Using fake competitors data");
@@ -61,6 +169,30 @@ const AdminPanel: React.FC = () => {
         ageGroup: c.ageGroup,
         avatar: c.avatar,
       })));
+    }
+  };
+
+  const fetchTeamOptions = async () => {
+    setTeamsLoading(true);
+    try {
+      const res = await apiFetch(ENDPOINT_TEAM_APPLICATIONS);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const payload: unknown = await res.json();
+      const options = getArrayPayloadItems(payload)
+        .map(normalizeTeamOption)
+        .filter((option): option is TeamOption => option !== null);
+
+      const uniqueOptions = Array.from(
+        new Map(options.map((option) => [option.value.toLowerCase(), option])).values()
+      ).sort((a, b) => a.label.localeCompare(b.label));
+
+      setTeamOptions(uniqueOptions);
+    } catch (err: any) {
+      setTeamOptions([]);
+      message.error("Failed to load team names: " + err.message);
+    } finally {
+      setTeamsLoading(false);
     }
   };
 
@@ -90,7 +222,12 @@ const AdminPanel: React.FC = () => {
 
   const handleUpdateSettings = async () => {
     try {
-      const payload = { PowerCoef: powerCoef, MaxSpd: maxSpd };
+      const payload = {
+        PowerCoef: powerCoef,
+        MaxSpd: maxSpd,
+        FullRaceLength: fullRaceLength,
+        DragRaceLength: dragRaceLength,
+      };
       console.log("POST settings payload:", payload);
       const res = await apiFetch(ENDPOINT_ADMIN_SETTINGS, {
         method: "POST",
@@ -117,6 +254,7 @@ const AdminPanel: React.FC = () => {
 
   useEffect(() => {
     fetchCompetitors();
+    fetchTeamOptions();
     // Fetch global settings
     apiFetch(ENDPOINT_ADMIN_SETTINGS)
       .then(res => {
@@ -126,18 +264,22 @@ const AdminPanel: React.FC = () => {
       .then(data => {
         setPowerCoef(data.PowerCoef ?? 0);
         setMaxSpd(data.MaxSpd ?? 0);
+        setFullRaceLength(data.FullRaceLength ?? 0);
+        setDragRaceLength(data.DragRaceLength ?? 0);
       })
       .catch(() => {
         // Use fake settings
         console.log("Using fake admin settings");
         setPowerCoef(fakeAdminSettings.PowerCoef);
         setMaxSpd(fakeAdminSettings.MaxSpd);
+        setFullRaceLength(fakeAdminSettings.FullRaceLength);
+        setDragRaceLength(fakeAdminSettings.DragRaceLength);
       });
   }, []);
 
   const handleAddOk = () => {
     addForm.validateFields().then(vals => {
-      setCompetitors(prev => [...prev, vals]);
+      setCompetitors(prev => [...(Array.isArray(prev) ? prev : []), vals]);
       addForm.resetFields();
       setAddVisible(false);
     });
@@ -146,14 +288,14 @@ const AdminPanel: React.FC = () => {
   const handleEditOk = () => {
     editForm.validateFields().then(vals => {
       setCompetitors(prev =>
-        prev.map(c => (c.id === editing?.id ? { ...c, ...vals } : c))
+        (Array.isArray(prev) ? prev : []).map(c => (c.id === editing?.id ? { ...c, ...vals } : c))
       );
       setEditVisible(false);
     });
   };
 
-  const handleDelete = (id: string) => {
-    setCompetitors(prev => prev.filter(c => c.id !== id));
+  const handleDelete = (id: number) => {
+    setCompetitors(prev => (Array.isArray(prev) ? prev : []).filter(c => c.id !== id));
     setEditVisible(false);
   };
 
@@ -182,7 +324,7 @@ const AdminPanel: React.FC = () => {
       ),
     },
     {
-      title: "Username",
+      title: "Team name",
       dataIndex: "username",
       key: "username",
       sorter: (a: Competitor, b: Competitor) =>
@@ -194,7 +336,7 @@ const AdminPanel: React.FC = () => {
       key: "id",
       width: 70,
       sorter: (a: Competitor, b: Competitor) =>
-        parseInt(a.id, 10) - parseInt(b.id, 10),
+        a.id - b.id,
     },
     {
       title: "Age Group",
@@ -229,6 +371,24 @@ const AdminPanel: React.FC = () => {
                   value={maxSpd}
                   onChange={v => setMaxSpd(v ?? 0)}
                   style={{ width: 120 }}
+                />
+              </Form.Item>
+              <Form.Item label="Full Race Length">
+                <InputNumber
+                  min={0}
+                  step={0.01}
+                  value={fullRaceLength}
+                  onChange={v => setFullRaceLength(v ?? 0)}
+                  style={{ width: 140 }}
+                />
+              </Form.Item>
+              <Form.Item label="Drag Race Length">
+                <InputNumber
+                  min={0}
+                  step={0.01}
+                  value={dragRaceLength}
+                  onChange={v => setDragRaceLength(v ?? 0)}
+                  style={{ width: 140 }}
                 />
               </Form.Item>
               <Form.Item>
@@ -281,14 +441,21 @@ const AdminPanel: React.FC = () => {
             label="ID"
             rules={[{ required: true, message: "Please enter an ID" }]}
           >
-            <Input />
+            <InputNumber min={1} precision={0} style={{ width: "100%" }} />
           </Form.Item>
           <Form.Item
             name="username"
-            label="Username"
-            rules={[{ required: true, message: "Please enter a username" }]}
+            label="Team name"
+            rules={[{ validator: validateTeamName }]}
           >
-            <Input />
+            <Select
+              showSearch
+              loading={teamsLoading}
+              options={teamOptions}
+              placeholder="Select existing team"
+              optionFilterProp="label"
+              notFoundContent={teamsLoading ? "Loading teams..." : "No teams found"}
+            />
           </Form.Item>
           <Form.Item
             name="ageGroup"
@@ -330,10 +497,17 @@ const AdminPanel: React.FC = () => {
         <Form layout="vertical" form={editForm}>
           <Form.Item
             name="username"
-            label="Username"
-            rules={[{ required: true, message: "Please enter a username" }]}
+            label="Team name"
+            rules={[{ validator: validateTeamName }]}
           >
-            <Input />
+            <Select
+              showSearch
+              loading={teamsLoading}
+              options={teamOptions}
+              placeholder="Select existing team"
+              optionFilterProp="label"
+              notFoundContent={teamsLoading ? "Loading teams..." : "No teams found"}
+            />
           </Form.Item>
           <Form.Item
             name="ageGroup"

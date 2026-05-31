@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Alert, Button, Card, Form, Input, Select, Typography, message } from "antd";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/webapp/authentification/AuthContext";
 import { ENDPOINT_AUTH_REGISTER, ENDPOINT_TEAMS } from "@/webapp/config/endpoints";
@@ -191,6 +191,7 @@ function getLocalTeams(): SelectableTeam[] {
 const SignUpPage: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { uniqueID } = useParams<{ uniqueID?: string }>();
   const [searchParams] = useSearchParams();
   const { login, isAuthenticated } = useAuth();
   const [form] = Form.useForm<SignUpValues>();
@@ -198,6 +199,7 @@ const SignUpPage: React.FC = () => {
   const [teams, setTeams] = useState<SelectableTeam[]>(() => getLocalTeams());
   const [teamsLoading, setTeamsLoading] = useState(false);
   const leaderVerificationId = (
+    uniqueID ??
     searchParams.get("uniqueID") ??
     searchParams.get("uniqueId") ??
     ""

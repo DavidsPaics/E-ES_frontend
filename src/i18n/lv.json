@@ -582,6 +582,7 @@
         "copy": "Kopēt",
         "close": "Aizvērt",
         "accept": "Apstiprināt",
+        "decline": "Noraidīt",
         "remove": "Noņemt",
         "delete": "Dzēst",
         "kick": "Izslēgt"
@@ -604,7 +605,8 @@
         "leaveTeam": "Vai iziet no pašreizējās komandas?",
         "deleteAccount": "Vai neatgriezeniski dzēst jūsu kontu?",
         "deleteTeam": "Vai dzēst komandu \"{{name}}\"?",
-        "kickMember": "Vai izslēgt šo dalībnieku no komandas?"
+        "kickMember": "Vai izslēgt šo dalībnieku no komandas?",
+        "declinePendingMember": "Vai noraidīt šo neverificēto kontu?"
       },
       "messages": {
         "noSession": "Nav aktīvas lietotāja sesijas. Lūdzu pieslēdzieties vēlreiz.",
@@ -619,6 +621,8 @@
         "leaderLinkCopyFailed": "Neizdevās nokopēt komandas līdera verifikācijas saiti.",
         "pendingMemberAccepted": "Gaidošais komandas dalībnieks apstiprināts.",
         "pendingMemberAcceptFailed": "Neizdevās apstiprināt gaidošo komandas dalībnieku.",
+        "pendingMemberDeclined": "Neverificētais konts noraidīts.",
+        "pendingMemberDeclineFailed": "Neizdevās noraidīt neverificēto kontu.",
         "imageReadFailed": "Neizdevās nolasīt attēlu failus.",
         "documentReadFailed": "Neizdevās nolasīt dokumentu failus.",
         "profilePictureReadFailed": "Neizdevās nolasīt profila attēlu.",

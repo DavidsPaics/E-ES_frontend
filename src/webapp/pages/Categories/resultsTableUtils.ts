@@ -6,6 +6,43 @@ export type CategoryRawCompetitor = {
   [key: string]: unknown;
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function getArrayPayloadItems(payload: unknown): unknown[] {
+  if (Array.isArray(payload)) return payload;
+  if (!isRecord(payload)) return [];
+
+  for (const key of ["data", "cars", "competitors", "items", "results"]) {
+    const value = payload[key];
+    if (Array.isArray(value)) return value;
+  }
+
+  return [];
+}
+
+export function normalizeCategoryCompetitors(payload: unknown): CategoryRawCompetitor[] {
+  return getArrayPayloadItems(payload)
+    .map((item, index) => {
+      if (!isRecord(item)) return null;
+      const id = toNumber(item.id ?? item.ID ?? item.car_id ?? item.carId, Number.NaN);
+      if (!Number.isFinite(id)) return null;
+
+      const username =
+        getTeam(item as CategoryRawCompetitor, `Team ${id}`) ||
+        `Team ${id}`;
+
+      return {
+        ...item,
+        id,
+        username,
+        key: item.key ?? `${id}-${index}`,
+      } as CategoryRawCompetitor;
+    })
+    .filter((item): item is CategoryRawCompetitor => item !== null);
+}
+
 function pad(value: number): string {
   return String(value).padStart(2, "0");
 }

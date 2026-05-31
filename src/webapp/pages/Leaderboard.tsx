@@ -58,7 +58,7 @@ const Leaderboard: React.FC = () => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json() as Promise<
           Array<{
-            id: string;
+            id: number;
             username: string;
             avatar: string;
             U: number;

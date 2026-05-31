@@ -8,6 +8,7 @@ import {
   Image,
   Input,
   Modal,
+  Popconfirm,
   Select,
   Space,
   Table,
@@ -97,6 +98,7 @@ interface PendingTeamMemberApplication extends TeamModerationMember {
   teamName: string;
   pendingTeamId?: string;
   username: string;
+  verificationKey?: string;
 }
 
 interface TeamModerationMemberRow extends TeamModerationMember {
@@ -170,6 +172,13 @@ function firstString(values: unknown[], fallback = ""): string {
   return fallback;
 }
 
+function firstBoolean(values: unknown[], fallback: boolean | undefined = undefined): boolean | undefined {
+  for (const value of values) {
+    if (typeof value === "boolean") return value;
+  }
+  return fallback;
+}
+
 function normalizeUserRole(value: unknown): UserRole {
   if (
     value === "participant" ||
@@ -205,21 +214,37 @@ function normalizeAccountInfo(value: unknown, index: number): PublicUserRecord |
     username
   );
   const role = normalizeUserRole(data.role ?? value.role ?? value.type);
+  const pendingTeamId = firstString([value.pendingTeamId, value.pendingTeamID, data.pendingTeamId, data.pendingTeamID], "");
+  const educationalInstitution = firstString(
+    [value.educationalInstitution, data.educationalInstitution, value.school, data.school],
+    ""
+  );
+  const classOrYear = firstString([value.classOrYear, data.classOrYear, value.grade, data.grade], "");
+  const profilePicture = firstString([value.profilePicture, data.profilePicture, data.avatar], "");
 
   return {
     id: accountId,
     username,
     role,
-    teamId: firstString([value.teamId, value.team_id, value.komandasId, data.teamId, data.ID, data.id], "") || undefined,
+    teamId: firstString([value.teamId, value.team_id, value.komandasId, data.teamId, data.ID, data.id, pendingTeamId], "") || undefined,
     profile: {
       name: firstString([data.fullName, data.name, data.full_name], username),
       dateOfBirth: firstString([data.dateOfBirth, data.dzimsanasDatums], "") || undefined,
-      school: firstString([data.educationalInstitution, data.school], ""),
-      grade: firstString([data.classOrYear, data.grade], ""),
+      school: educationalInstitution,
+      grade: classOrYear,
       phone: firstString([value.telefonanumurs, value.phoneNumber, data.phone, data.phoneNumber], ""),
       email: firstString([value.epasts, value.email, data.email], ""),
-      profilePicture: firstString([data.profilePicture, data.avatar], ""),
+      profilePicture,
       aboutMe: firstString([data.aboutMe, data.bio], ""),
+    },
+    account: {
+      parole: firstString([value.parole], ""),
+      salt: firstString([value.salt], ""),
+      pendingTeamId,
+      registered: firstBoolean([value.registered, data.registered]),
+      profilePicture,
+      educationalInstitution,
+      classOrYear,
     },
   };
 }
@@ -264,9 +289,13 @@ function normalizePendingTeamMemberApplication(
   if (!isRecord(value)) return null;
 
   const data = isRecord(value.dati) ? value.dati : value;
-  const key = firstString([value.key, value.id, value.ID], `pending-member-${index + 1}`);
+  const verificationKey = firstString(
+    [value.key, data.key, value.accountKey, value.accountId, value.id, value.ID, data.id],
+    ""
+  );
+  const key = verificationKey || `pending-member-${index + 1}`;
   const fullName = firstString([value.fullName, value.vardsUzvards, value.name, data.fullName, data.name], "");
-  const pendingTeamId = firstString([value.pendingTeamId, value.teamId, value.komandasId, data.pendingTeamId], "");
+  const pendingTeamId = firstString([value.pendingTeamId, value.pendingTeamID, value.teamId, value.komandasId, data.pendingTeamId, data.pendingTeamID], "");
   const teamName = firstString(
     [value.komandasNosaukums, value.teamName, value.team, data.teamName, data.komandasNosaukums, pendingTeamId],
     ""
@@ -278,12 +307,14 @@ function normalizePendingTeamMemberApplication(
     fullName,
     teamName,
     pendingTeamId: pendingTeamId || undefined,
+    verificationKey: verificationKey || undefined,
     username: firstString([value.lietotajvards, value.username], ""),
     role: firstString([value.role, value.loma, data.role, data.loma], "") || undefined,
     dateOfBirth: firstString([value.dateOfBirth, value.dzimsanasDatums, data.dateOfBirth, data.dzimsanasDatums], "") || undefined,
     educationalInstitution: firstString([value.educationalInstitution, value.school, data.educationalInstitution, data.school], "") || undefined,
     phone: firstString([value.telefonanumurs, value.phoneNumber, value.phone, data.phone, data.phoneNumber], "") || undefined,
     email: firstString([value.epasts, value.email, data.email, data.epasts], "") || undefined,
+    classOrYear: firstString([value.classOrYear, value.grade, data.classOrYear, data.grade], "") || undefined,
   };
 }
 
@@ -472,7 +503,7 @@ function normalizeRoleTranslationKey(role?: string): string {
 }
 
 function getLeaderVerificationLink(teamId: string): string {
-  return `${LEADER_VERIFICATION_SIGNUP_ORIGIN}/signup?uniqueID=${encodeURIComponent(teamId)}`;
+  return `${LEADER_VERIFICATION_SIGNUP_ORIGIN}/signup/${encodeURIComponent(teamId)}`;
 }
 
 async function copyTextToClipboard(text: string): Promise<void> {
@@ -524,25 +555,35 @@ function buildAccountPayload(
 ) {
   const profilePicture = (values.profilePicture || "").trim();
   const dateOfBirth = getApiDateOfBirth(values, user.profile.dateOfBirth);
+  const educationalInstitution = values.school.trim();
+  const classOrYear = values.grade.trim();
+  const pendingTeamId = teamId || user.account?.pendingTeamId || "";
+  const registered = user.account?.registered ?? true;
 
   return {
     key: user.id,
+    dati: {
+      key: user.id,
+      id: pendingTeamId,
+      fullName: values.name.trim(),
+      dateOfBirth,
+      educationalInstitution,
+      role,
+      classOrYear,
+      email: values.email.trim(),
+      registered,
+    },
+    parole: user.account?.parole ?? "",
     lietotajvards: values.username.trim(),
     epasts: values.email.trim(),
     telefonanumurs: values.phone.trim(),
-    teamId,
-    komandasId: teamId,
-    role,
-    dati: {
-      key: user.id,
-      id: teamId || "",
-      fullName: values.name.trim(),
-      dateOfBirth,
-      educationalInstitution: values.school.trim(),
-      role,
-      classOrYear: values.grade.trim(),
-      profilePicture,
-    },
+    salt: user.account?.salt ?? "",
+    pendingTeamId,
+    pendingTeamID: pendingTeamId,
+    registered,
+    educationalInstitution,
+    classOrYear,
+    profilePicture,
   };
 }
 
@@ -567,6 +608,60 @@ function buildUpdatedUser(
       email: values.email.trim(),
       profilePicture: (values.profilePicture || "").trim(),
     },
+    account: {
+      ...user.account,
+      pendingTeamId: teamId || user.account?.pendingTeamId,
+      registered: user.account?.registered ?? true,
+      educationalInstitution: values.school.trim(),
+      classOrYear: values.grade.trim(),
+      profilePicture: (values.profilePicture || "").trim(),
+    },
+  };
+}
+
+function isAcceptedStatus(status?: string): boolean {
+  const normalized = (status || "").trim().toLowerCase();
+  return normalized === "accepted" || normalized === "approved" || normalized === "apstiprināts";
+}
+
+function buildTeamAcceptPayload(record: TeamModerationRecord) {
+  return {
+    key: record.id,
+    teamName: record.name,
+    members: record.members.map((member) => ({
+      key: member.key,
+      dati: {
+        key: member.key,
+        id: record.id,
+        fullName: member.fullName,
+        dateOfBirth: member.dateOfBirth || "",
+        educationalInstitution: member.educationalInstitution || "",
+        role: member.role || "participant",
+        classOrYear: member.classOrYear || "",
+        email: member.email || "",
+        registered: true,
+      },
+      parole: "",
+      lietotajvards: member.email || member.fullName,
+      epasts: member.email || "",
+      telefonanumurs: member.phone || "",
+      salt: "",
+      pendingTeamId: record.id,
+      pendingTeamID: record.id,
+      registered: true,
+      educationalInstitution: member.educationalInstitution || "",
+      classOrYear: member.classOrYear || "",
+    })),
+    ageGroup: record.ageGroup || "",
+    institution: record.institution || "",
+    cityOrRegion: record.cityOrRegion || "",
+    responsiblePerson: {
+      fullName: record.responsiblePerson?.fullName || "",
+      phone: record.responsiblePerson?.phone || "",
+      email: record.responsiblePerson?.email || "",
+      status: record.responsiblePerson?.status || "",
+    },
+    avatar: record.profilePicture || "",
   };
 }
 
@@ -671,6 +766,8 @@ const CabinetPage: React.FC = () => {
   const [teamsLoading, setTeamsLoading] = useState(false);
   const [pendingTeamMembersLoading, setPendingTeamMembersLoading] = useState(false);
   const [acceptingPendingMemberKey, setAcceptingPendingMemberKey] = useState<string | null>(null);
+  const [decliningPendingMemberKey, setDecliningPendingMemberKey] = useState<string | null>(null);
+  const [acceptingTeamKey, setAcceptingTeamKey] = useState<string | null>(null);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
   const [viewingTeam, setViewingTeam] = useState<TeamModerationRecord | null>(null);
@@ -686,6 +783,7 @@ const CabinetPage: React.FC = () => {
     currentUser?.role === "supervisor";
   const isSuperAdmin = currentUser?.role === "super_admin";
   const canAcceptPendingMembers = isSuperAdmin || currentUser?.role === "team_leader";
+  const canAcceptTeamApplications = isSuperAdmin;
   const c = (key: string, options?: Record<string, unknown>) =>
     t(`website.cabinet.${key}`, options);
   const formatRoleLabel = (role: UserRole) => {
@@ -732,11 +830,26 @@ const CabinetPage: React.FC = () => {
         classOrYear: member.classOrYear,
         username: member.username,
         status: "pending",
-        pendingApplicationKey: member.key,
+        pendingApplicationKey: member.verificationKey,
       }));
 
     return [...registeredRows, ...pendingRows];
   }, [pendingTeamMembers, viewingTeam]);
+
+  const visiblePendingTeamMembers = useMemo(() => {
+    if (!currentUser) return [];
+    if (isSuperAdmin) return pendingTeamMembers;
+
+    const currentTeam = currentUser.teamId
+      ? allTeams.find((team) => team.id === currentUser.teamId)
+      : undefined;
+    const currentTeamName = currentTeam ? normalizeTeamName(currentTeam.name) : "";
+
+    return pendingTeamMembers.filter((member) => {
+      if (member.pendingTeamId && member.pendingTeamId === currentUser.teamId) return true;
+      return currentTeamName.length > 0 && normalizeTeamName(member.teamName) === currentTeamName;
+    });
+  }, [allTeams, currentUser, isSuperAdmin, pendingTeamMembers]);
 
   const fetchModerationUsers = async () => {
     setUsersLoading(true);
@@ -900,6 +1013,13 @@ const CabinetPage: React.FC = () => {
   };
 
   const handleAcceptPendingMember = async (applicationKey: string) => {
+    if (!applicationKey || applicationKey.startsWith("pending-member-")) {
+      message.error(c("messages.pendingMemberMissingKey", {
+        defaultValue: "Kontam nav derīgas verifikācijas atslēgas.",
+      }));
+      return;
+    }
+
     setAcceptingPendingMemberKey(applicationKey);
     try {
       const response = await apiFetch(
@@ -919,6 +1039,72 @@ const CabinetPage: React.FC = () => {
       message.error(text);
     } finally {
       setAcceptingPendingMemberKey(null);
+    }
+  };
+
+  const handleDeclinePendingMember = async (applicationKey: string) => {
+    if (!applicationKey || applicationKey.startsWith("pending-member-")) {
+      message.error(c("messages.pendingMemberMissingKey", {
+        defaultValue: "Kontam nav derīgas verifikācijas atslēgas.",
+      }));
+      return;
+    }
+
+    setDecliningPendingMemberKey(applicationKey);
+    try {
+      const response = await apiFetch(
+        `${ENDPOINT_ACCOUNT}/${encodeURIComponent(applicationKey)}`,
+        { method: "DELETE" }
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      setPendingTeamMembers((prev) =>
+        prev.filter((member) => member.verificationKey !== applicationKey && member.key !== applicationKey)
+      );
+      void fetchPendingTeamMemberApplications();
+      if (isSuperAdmin) void fetchModerationUsers();
+      message.success(c("messages.pendingMemberDeclined", {
+        defaultValue: "Neverificētais konts noraidīts.",
+      }));
+    } catch (error) {
+      const text =
+        error instanceof Error
+          ? error.message
+          : c("messages.pendingMemberDeclineFailed", {
+              defaultValue: "Neizdevās noraidīt neverificēto kontu.",
+            });
+      message.error(text);
+    } finally {
+      setDecliningPendingMemberKey(null);
+    }
+  };
+
+  const handleAcceptTeamApplication = async (record: TeamModerationRecord) => {
+    setAcceptingTeamKey(record.id);
+    try {
+      const response = await apiFetch(`${ENDPOINT_TEAM}/${encodeURIComponent(record.id)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildTeamAcceptPayload(record)),
+      });
+
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      setAllTeams((prev) =>
+        prev.map((item) => (item.id === record.id ? { ...item, status: "accepted" } : item))
+      );
+      setViewingTeam((prev) =>
+        prev && prev.id === record.id ? { ...prev, status: "accepted" } : prev
+      );
+      message.success(c("messages.teamAccepted", { defaultValue: "Komanda apstiprināta." }));
+      void fetchModerationTeams();
+    } catch (error) {
+      const text = error instanceof Error
+        ? error.message
+        : c("messages.teamAcceptFailed", { defaultValue: "Neizdevās apstiprināt komandu." });
+      message.error(text);
+    } finally {
+      setAcceptingTeamKey(null);
     }
   };
 
@@ -1156,12 +1342,104 @@ const CabinetPage: React.FC = () => {
     {
       title: c("columns.actions"),
       key: "actions",
-      width: 90,
+      width: 190,
       render: (_: unknown, record: TeamModerationRecord) => (
-        <Button size="small" onClick={() => setViewingTeam(record)}>
-          {c("actions.view")}
-        </Button>
+        <Space size="small" wrap>
+          <Button size="small" onClick={() => setViewingTeam(record)}>
+            {c("actions.view")}
+          </Button>
+          {canAcceptTeamApplications && !isAcceptedStatus(record.status) && (
+            <Button
+              size="small"
+              type="primary"
+              loading={acceptingTeamKey === record.id}
+              onClick={() => handleAcceptTeamApplication(record)}
+            >
+              {c("actions.accept")}
+            </Button>
+          )}
+        </Space>
       ),
+    },
+  ];
+
+  const pendingAccountColumns = [
+    {
+      title: c("columns.user"),
+      key: "user",
+      render: (_: unknown, record: PendingTeamMemberApplication) => (
+        <div>
+          <div className="font-semibold">{record.fullName}</div>
+          {record.username && <div className="text-xs text-gray-500">@{record.username}</div>}
+        </div>
+      ),
+    },
+    {
+      title: c("columns.role"),
+      key: "role",
+      render: (_: unknown, record: PendingTeamMemberApplication) => formatTeamRoleLabel(record.role),
+    },
+    {
+      title: c("columns.team"),
+      dataIndex: "teamName",
+      key: "teamName",
+    },
+    {
+      title: c("columns.institution"),
+      key: "institution",
+      responsive: ["md" as const],
+      render: (_: unknown, record: PendingTeamMemberApplication) =>
+        record.educationalInstitution || "-",
+    },
+    {
+      title: c("columns.contact"),
+      key: "contact",
+      responsive: ["lg" as const],
+      render: (_: unknown, record: PendingTeamMemberApplication) =>
+        [record.email, record.phone].filter(Boolean).join(" / ") || "-",
+    },
+    {
+      title: c("columns.actions"),
+      key: "actions",
+      width: 210,
+      render: (_: unknown, record: PendingTeamMemberApplication) => {
+        const verificationKey = record.verificationKey;
+
+        return (
+          <Space size="small" wrap>
+            <Button
+              size="small"
+              type="primary"
+              disabled={!verificationKey}
+              loading={verificationKey ? acceptingPendingMemberKey === verificationKey : false}
+              onClick={() => verificationKey && handleAcceptPendingMember(verificationKey)}
+            >
+              {c("actions.accept")}
+            </Button>
+            {isSuperAdmin && (
+              <Popconfirm
+                title={c("confirm.declinePendingMember", {
+                  defaultValue: "Vai noraidīt šo neverificēto kontu?",
+                })}
+                okText={c("actions.decline", { defaultValue: "Noraidīt" })}
+                cancelText={c("actions.close")}
+                okButtonProps={{ danger: true }}
+                onConfirm={() => verificationKey && handleDeclinePendingMember(verificationKey)}
+                disabled={!verificationKey}
+              >
+                <Button
+                  size="small"
+                  danger
+                  disabled={!verificationKey}
+                  loading={verificationKey ? decliningPendingMemberKey === verificationKey : false}
+                >
+                  {c("actions.decline", { defaultValue: "Noraidīt" })}
+                </Button>
+              </Popconfirm>
+            )}
+          </Space>
+        );
+      },
     },
   ];
 
@@ -1296,6 +1574,25 @@ const CabinetPage: React.FC = () => {
               loading={teamsLoading}
               pagination={allTeams.length > 10 ? { pageSize: 10 } : false}
               locale={{ emptyText: c("empty.noTeamAssigned") }}
+            />
+          </Card>
+        )}
+
+        {canAcceptPendingMembers && (
+          <Card
+            title={c("cards.unverifiedAccounts", { defaultValue: "Neverificētie konti" })}
+          >
+            <Table<PendingTeamMemberApplication>
+              dataSource={visiblePendingTeamMembers}
+              rowKey="key"
+              columns={pendingAccountColumns}
+              loading={pendingTeamMembersLoading}
+              pagination={visiblePendingTeamMembers.length > 10 ? { pageSize: 10 } : false}
+              locale={{
+                emptyText: c("empty.noUnverifiedAccounts", {
+                  defaultValue: "Nav neverificētu kontu.",
+                }),
+              }}
             />
           </Card>
         )}

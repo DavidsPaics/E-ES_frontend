@@ -5,7 +5,7 @@
 // COMPETITORS
 // ============================================
 export type FakeCompetitor = {
-  id: string;
+  id: number;
   username: string;
   U: number;
   I: number;
@@ -15,18 +15,18 @@ export type FakeCompetitor = {
 };
 
 export const fakeCompetitors: FakeCompetitor[] = [
-  { id: "1", username: "Lightning McQueen", U: 48, I: 12, m: 85, ageGroup: "A", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=1" },
-  { id: "2", username: "Speed Racer", U: 52, I: 10, m: 78, ageGroup: "A", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=2" },
-  { id: "3", username: "Turbo Thunder", U: 45, I: 15, m: 92, ageGroup: "A", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=3" },
-  { id: "4", username: "Electric Eagle", U: 50, I: 11, m: 80, ageGroup: "B", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=4" },
-  { id: "5", username: "Volt Viper", U: 48, I: 14, m: 88, ageGroup: "B", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=5" },
-  { id: "6", username: "Spark Storm", U: 55, I: 9, m: 75, ageGroup: "B", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=6" },
-  { id: "7", username: "Watt Warrior", U: 46, I: 13, m: 82, ageGroup: "C", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=7" },
-  { id: "8", username: "Amp Avenger", U: 51, I: 12, m: 90, ageGroup: "C", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=8" },
-  { id: "9", username: "Current Cruiser", U: 49, I: 11, m: 77, ageGroup: "C", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=9" },
-  { id: "10", username: "Battery Blitz", U: 53, I: 10, m: 84, ageGroup: "A", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=10" },
-  { id: "11", username: "Ohm Overlord", U: 47, I: 14, m: 86, ageGroup: "B", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=11" },
-  { id: "12", username: "Circuit Chaser", U: 50, I: 12, m: 81, ageGroup: "C", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=12" },
+  { id: 1, username: "Lightning McQueen", U: 48, I: 12, m: 85, ageGroup: "A", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=1" },
+  { id: 2, username: "Speed Racer", U: 52, I: 10, m: 78, ageGroup: "A", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=2" },
+  { id: 3, username: "Turbo Thunder", U: 45, I: 15, m: 92, ageGroup: "A", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=3" },
+  { id: 4, username: "Electric Eagle", U: 50, I: 11, m: 80, ageGroup: "B", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=4" },
+  { id: 5, username: "Volt Viper", U: 48, I: 14, m: 88, ageGroup: "B", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=5" },
+  { id: 6, username: "Spark Storm", U: 55, I: 9, m: 75, ageGroup: "B", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=6" },
+  { id: 7, username: "Watt Warrior", U: 46, I: 13, m: 82, ageGroup: "C", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=7" },
+  { id: 8, username: "Amp Avenger", U: 51, I: 12, m: 90, ageGroup: "C", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=8" },
+  { id: 9, username: "Current Cruiser", U: 49, I: 11, m: 77, ageGroup: "C", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=9" },
+  { id: 10, username: "Battery Blitz", U: 53, I: 10, m: 84, ageGroup: "A", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=10" },
+  { id: 11, username: "Ohm Overlord", U: 47, I: 14, m: 86, ageGroup: "B", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=11" },
+  { id: 12, username: "Circuit Chaser", U: 50, I: 12, m: 81, ageGroup: "C", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=12" },
 ];
 
 // ============================================
@@ -44,7 +44,7 @@ export type FakeLeaderboardEntry = {
 const categoryNames = ["EkoRace", "MainRace", "DragRace", "ShuttleRun", "SteeringTest", "BrakingTest"];
 
 export const fakeLeaderboardAll: FakeLeaderboardEntry[] = fakeCompetitors.map((c) => ({
-  ID: parseInt(c.id),
+  ID: c.id,
   username: c.username,
   avatar: c.avatar,
   position_change: Math.floor(Math.random() * 5) - 2,
@@ -83,7 +83,7 @@ const baseCoords = { lat: 56.66090993638844, lon: 23.74363904512851 };
 
 export const fakeLiveData: FakeLiveRow[] = fakeCompetitors.slice(0, 8).map((c, idx) => ({
   key: `live-${c.id}`,
-  ID: parseInt(c.id),
+  ID: c.id,
   username: c.username,
   avatar: c.avatar,
   status: idx < 5 ? "online" : idx < 7 ? "ping" : "offline",
@@ -146,7 +146,7 @@ const generateTime = (baseMinutes: number, variation: number): string => {
 
 export const fakeResultsByRace: Record<string, FakeResultEntry[]> = {
   EkoRace: fakeCompetitors.map((c, idx) => ({
-    ID: parseInt(c.id),
+    ID: c.id,
     Username: c.username,
     avatar: c.avatar,
     "Used energy": parseFloat((Math.random() * 50 + 30).toFixed(2)),
@@ -156,7 +156,7 @@ export const fakeResultsByRace: Record<string, FakeResultEntry[]> = {
     Points: Math.max(0, 100 - idx * 8),
   })),
   MainRace: fakeCompetitors.map((c, idx) => ({
-    ID: parseInt(c.id),
+    ID: c.id,
     Username: c.username,
     avatar: c.avatar,
     "Used energy": parseFloat((Math.random() * 80 + 60).toFixed(2)),
@@ -166,7 +166,7 @@ export const fakeResultsByRace: Record<string, FakeResultEntry[]> = {
     Points: Math.max(0, 100 - idx * 8),
   })),
   DragRace: fakeCompetitors.map((c, idx) => ({
-    ID: parseInt(c.id),
+    ID: c.id,
     Username: c.username,
     avatar: c.avatar,
     "Used energy": parseFloat((Math.random() * 15 + 10).toFixed(2)),
@@ -176,7 +176,7 @@ export const fakeResultsByRace: Record<string, FakeResultEntry[]> = {
     Points: Math.max(0, 100 - idx * 8),
   })),
   ShuttleRun: fakeCompetitors.map((c, idx) => ({
-    ID: parseInt(c.id),
+    ID: c.id,
     Username: c.username,
     avatar: c.avatar,
     "Used energy": parseFloat((Math.random() * 30 + 20).toFixed(2)),
@@ -186,7 +186,7 @@ export const fakeResultsByRace: Record<string, FakeResultEntry[]> = {
     Points: Math.max(0, 100 - idx * 8),
   })),
   SteeringTest: fakeCompetitors.map((c, idx) => ({
-    ID: parseInt(c.id),
+    ID: c.id,
     Username: c.username,
     avatar: c.avatar,
     "Used energy": parseFloat((Math.random() * 20 + 15).toFixed(2)),
@@ -196,7 +196,7 @@ export const fakeResultsByRace: Record<string, FakeResultEntry[]> = {
     Points: Math.max(0, 100 - idx * 8),
   })),
   BrakingTest: fakeCompetitors.map((c, idx) => ({
-    ID: parseInt(c.id),
+    ID: c.id,
     Username: c.username,
     avatar: c.avatar,
     "Used energy": parseFloat((Math.random() * 10 + 5).toFixed(2)),
@@ -254,7 +254,7 @@ export const fakePointsResults: FakeRawResult[] = fakeCompetitors.flatMap((c) =>
   fakeRaces.filter(r => r.RaceName === "EkoRace" || r.RaceName === "MainRace").map(race => ({
     RaceName: race.RaceName,
     Lap: race.Lap,
-    ID: parseInt(c.id),
+    ID: c.id,
     Username: c.username,
     avatar: c.avatar,
     "Used energy": parseFloat((Math.random() * 50 + 30).toFixed(2)),
@@ -272,6 +272,8 @@ export const fakePointsResults: FakeRawResult[] = fakeCompetitors.flatMap((c) =>
 export const fakeAdminSettings = {
   PowerCoef: 1.5,
   MaxSpd: 60,
+  FullRaceLength: 0,
+  DragRaceLength: 0,
 };
 
 // ============================================
@@ -286,7 +288,7 @@ export type FakeCategoryCompetitor = {
 };
 
 export const fakeCategoryCompetitors: FakeCategoryCompetitor[] = fakeCompetitors.map((c, idx) => ({
-  id: parseInt(c.id),
+  id: c.id,
   username: c.username,
   avatar: c.avatar,
   // Some competitors already have times

@@ -31,10 +31,10 @@ export const ENDPOINT_COMPETITORS_FINISH = `${BASE_URL}/api/car/finish`;
 
 // Race endpoints
 export const ENDPOINT_RACES = `${BASE_URL}/api/races`;
-export const ENDPOINT_RACE_CONFIG = `${BASE_URL}/api/race-config`;
 
 // Results endpoints
 export const ENDPOINT_RESULTS = `${BASE_URL}/api/results`;
+export const ENDPOINT_RACE_RESULTS_ALL = `${BASE_URL}/api/race-results/all`;
 
 // Points endpoints
 export const ENDPOINT_POINTS = `${BASE_URL}/api/points`;
@@ -66,6 +66,10 @@ export const ENDPOINT_EVENTS = `${BASE_URL}/api/events`;
 
 // WebSocket endpoints
 export const ENDPOINT_WS_LIVE = `${BASE_URL.replace(/^http/, "ws")}/ws`;
+
+// MQTT endpoints
+export const ENDPOINT_MQTT_LOGS = `${BASE_URL}/api/mqtt-logs`;
+export const ENDPOINT_MQTT_MESSAGE = `${BASE_URL}/api/mqtt-message`;
 
 // MapTiler API key and endpoint
 export const MAPTILER_KEY = env.VITE_MAPTILER_KEY ?? "";

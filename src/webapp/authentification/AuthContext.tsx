@@ -34,6 +34,13 @@ function firstString(values: unknown[], fallback = ""): string {
   return fallback;
 }
 
+function firstBoolean(values: unknown[], fallback: boolean | undefined = undefined): boolean | undefined {
+  for (const value of values) {
+    if (typeof value === "boolean") return value;
+  }
+  return fallback;
+}
+
 function normalizeRole(value: unknown): PublicUserRecord["role"] {
   if (value === "member") return "participant";
   if (
@@ -70,6 +77,13 @@ function normalizeLoginUser(payload: unknown, username: string): PublicUserRecor
     username
   );
   const isAdminInfo = "superadmin" in source;
+  const pendingTeamId = firstString([source.pendingTeamId, source.pendingTeamID], "");
+  const profilePicture = firstString([source.profilePicture, profileSource.profilePicture, profileSource.avatar], "");
+  const educationalInstitution = firstString(
+    [source.educationalInstitution, profileSource.educationalInstitution, profileSource.school],
+    ""
+  );
+  const classOrYear = firstString([source.classOrYear, profileSource.classOrYear, profileSource.grade], "");
 
   return {
     id: firstString(
@@ -82,16 +96,25 @@ function normalizeLoginUser(payload: unknown, username: string): PublicUserRecor
         ? "super_admin"
         : "admin"
       : normalizeRole(profileSource.role ?? source.role ?? source.type),
-    teamId: firstString([source.teamId, source.team_id, source.komandasId], "") || undefined,
+    teamId: firstString([source.teamId, source.team_id, source.komandasId, pendingTeamId], "") || undefined,
     profile: {
       name: firstString([profileSource.name, profileSource.fullName, profileSource.full_name], normalizedUsername),
       dateOfBirth: firstString([profileSource.dateOfBirth, profileSource.dzimsanasDatums], "") || undefined,
-      school: firstString([profileSource.school, profileSource.educationalInstitution], ""),
-      grade: firstString([profileSource.grade, profileSource.classOrYear], ""),
+      school: educationalInstitution,
+      grade: classOrYear,
       phone: firstString([source.telefonanumurs, source.phoneNumber, profileSource.phone, profileSource.phoneNumber], ""),
       email: firstString([source.epasts, source.email, profileSource.email], ""),
-      profilePicture: firstString([profileSource.profilePicture, profileSource.avatar], ""),
+      profilePicture,
       aboutMe: firstString([profileSource.aboutMe, profileSource.bio], ""),
+    },
+    account: {
+      parole: firstString([source.parole], ""),
+      salt: firstString([source.salt], ""),
+      pendingTeamId,
+      registered: firstBoolean([source.registered]),
+      profilePicture,
+      educationalInstitution,
+      classOrYear,
     },
   };
 }

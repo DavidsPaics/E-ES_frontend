@@ -64,9 +64,6 @@ const MainMenu: React.FC = () => {
       case 'scoring':
         navigate('/app/scoring');
         break;
-      case 'race-configuration':
-        navigate('/app/race-configuration');
-        break;
       case 'points':
         navigate('/app/points');
         break;
@@ -95,14 +92,13 @@ const MainMenu: React.FC = () => {
         { key: 'leaderboard', label: t('nav.leaderboard') },
         { key: 'results', label: t('nav.results') },
         { key: 'live-data', label: t('nav.liveData') },
-        { key: 'test', label: t('nav.test') },
-        { key: 'palette', label: t('nav.palette') },
+        isWebappAdmin && { key: 'test', label: t('nav.test') },
+        isWebappAdmin && { key: 'palette', label: t('nav.palette') },
         { key: 'login', label: t('nav.login'), disabled: isAuthenticated },
         isWebappAdmin && { key: 'admin', label: t('nav.admin') },
         isWebappAdmin && { key: 'news-admin', label: t('website.newsAdmin.header') },
         isAuthenticated && { key: 'logout', label: t('nav.logout') },
         isWebappAdmin && { key: 'scoring', label: t('nav.scoring') },
-        isWebappAdmin && { key: 'race-configuration', label: t('nav.raceConfig') },
         isWebappAdmin && { key: 'eko-race', label: t('categories.efficiencyRace') },
         isWebappAdmin && { key: 'main-race', label: t('categories.finalRace') },
         isWebappAdmin && { key: 'shuttle-run', label: t('categories.shuttleRun') },

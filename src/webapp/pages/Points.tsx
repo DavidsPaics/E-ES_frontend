@@ -29,7 +29,7 @@ const Points: React.FC = () => {
       } catch {
         console.log("Using fake competitors for Points");
         const fakeComps: Competitor[] = fakeCompetitorsList.map((c) => ({
-          id: parseInt(c.id),
+          id: c.id,
           username: c.username,
           avatar: c.avatar,
           U: c.U,

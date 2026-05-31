@@ -18,11 +18,11 @@ import ShuttleRun from "@/webapp/pages/Categories/ShuttleRun";
 import SteeringTest from "@/webapp/pages/Categories/SteeringTest";
 import DragRace from "@/webapp/pages/Categories/DragRace";
 import BrakingTest from "@/webapp/pages/Categories/BrakingTest";
-import RaceConfiguration from "@/webapp/pages/RaceConfiguration";
 import Points from "@/webapp/pages/Points";
 import ColorPalette from "@/webapp/pages/ColorPalette";
 import NewsAdminPage from "@/webapp/pages/NewsAdminPage";
 import ApplicationReviewPage from "@/webapp/pages/ApplicationReviewPage";
+import MqttManagementPage from "@/webapp/pages/MqttManagementPage";
 import WebappLayout from "@/webapp/components/WebappLayout.tsx";
 
 // Website pages
@@ -75,6 +75,7 @@ function App(): JSX.Element {
             <Route path="team/:teamId" element={<TeamPublicPage />} />
             <Route path="signin" element={<SignInPage />} />
             <Route path="signup" element={<SignUpPage />} />
+            <Route path="signup/:uniqueID" element={<SignUpPage />} />
             <Route path="cabinet" element={<PrivateRoute><CabinetPage /></PrivateRoute>} />
           </Route>
 
@@ -91,13 +92,13 @@ function App(): JSX.Element {
             <Route path="admin" element={<RoleRoute><AdminPanel /></RoleRoute>} />
             <Route path="news-admin" element={<RoleRoute><NewsAdminPage /></RoleRoute>} />
             <Route path="applications-review" element={<RoleRoute><ApplicationReviewPage /></RoleRoute>} />
+            <Route path="mqtt" element={<MqttManagementPage />} />
             <Route path="Category/EkoRace" element={<RoleRoute><EkoRace /></RoleRoute>} />
             <Route path="Category/MainRace" element={<RoleRoute><MainRace /></RoleRoute>} />
             <Route path="Category/ShuttleRun" element={<RoleRoute><ShuttleRun /></RoleRoute>} />
             <Route path="Category/SteeringTest" element={<RoleRoute><SteeringTest /></RoleRoute>} />
             <Route path="Category/DragRace" element={<RoleRoute><DragRace /></RoleRoute>} />
             <Route path="Category/BrakingTest" element={<RoleRoute><BrakingTest /></RoleRoute>} />
-            <Route path="race-configuration" element={<RoleRoute><RaceConfiguration /></RoleRoute>} />
             <Route path="points" element={<RoleRoute><Points /></RoleRoute>} />
             {/* TV Display Routes - Admin Only */}
             <Route path="tv/leaderboard" element={<RoleRoute><LeaderboardTV /></RoleRoute>} />
