@@ -35,7 +35,7 @@
     "final": "Final Stage"
   },
   "mainPage": {
-    "header": "🏁 E-ES Electric Vehicle Racing Competition 2026",
+    "header": "🏁 E-ES Electric Vehicle Racing Competition 2027",
     "totalCompetitors": "Total Competitors",
     "activeRaces": "Active Races",
     "completedRaces": "Completed Races",
@@ -363,7 +363,7 @@
     },
     "apply": {
       "title": "Apply to Compete",
-      "subtitle": "Register your team for the E-ES 2026",
+      "subtitle": "Register your team for the E-ES 2027",
       "summaryTitle": "How to Apply",
       "summaryText": "Fill out the application form with your team details and member information. Once submitted, your application will be reviewed by the organizing committee. You can track your application status in the table below.",
       "openForm": "Open Application Form",
@@ -372,7 +372,7 @@
       "deadline": "Deadline",
       "notYetOpenMessage": "Registration is NOT YET OPEN",
       "notYetOpenDescription": "The application form will be available starting:",
-      "openingDate": "01.04.2026 00:00",
+      "openingDate": "01.04.2027 00:00",
       "closedMessage": "Registration is currently CLOSED",
       "closedDescription": "The application deadline has passed. To register your team, please send an email to:",
       "requiredInfo": "Please include the following information: team name, team members (name, date of birth, role), responsible person (name, phone, email), age group, educational institution and other relevant information.",

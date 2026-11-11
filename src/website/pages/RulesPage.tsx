@@ -3,20 +3,20 @@ import { useTranslation } from "react-i18next";
 import { FilePdfOutlined, DownloadOutlined } from "@ant-design/icons";
 import "@ant-design/v5-patch-for-react-19";
 
-import rulesLv from "@/assets/pdf/Energo Efektivitātes Sacensību 2026 nolikums.pdf";
-import rulesEn from "@/assets/pdf/Energy Efficiency Competition 2026.pdf";
+import rulesLv from "@/assets/pdf/Energo Efektivitātes Sacensību 2027 nolikums.pdf";
+import rulesEn from "@/assets/pdf/Energy Efficiency Competition 2027.pdf";
 
 const RulesPage: React.FC = () => {
   const { t, i18n } = useTranslation();
 
   const pdfFiles = [
     {
-      label: "Energo Efektivitātes Sacensību 2026 nolikums",
+      label: "Energo Efektivitātes Sacensību 2027 nolikums",
       lang: "LV",
       href: rulesLv,
     },
     {
-      label: "Energy Efficiency Competition 2026",
+      label: "Energy Efficiency Competition 2027",
       lang: "EN",
       href: rulesEn,
     },

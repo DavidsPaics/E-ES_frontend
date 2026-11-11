@@ -35,7 +35,7 @@
     "final": "Fināla posms"
   },
   "mainPage": {
-    "header": "🏁 E-ES Elektroauto Sacensības 2026",
+    "header": "🏁 E-ES Elektroauto Sacensības 2027",
     "totalCompetitors": "Kopā dalībnieki",
     "activeRaces": "Aktīvās sacensības",
     "completedRaces": "Pabeigtās sacensības",
@@ -363,7 +363,7 @@
     },
     "apply": {
       "title": "Pieteikties sacensībām",
-      "subtitle": "Reģistrējiet savu komandu 2026. gada E-ES",
+      "subtitle": "Reģistrējiet savu komandu 2027. gada E-ES",
       "summaryTitle": "Kā pieteikties",
       "summaryText": "Aizpildiet pieteikuma formu ar komandas datiem un dalībnieku informāciju. Pēc iesniegšanas jūsu pieteikumu izskatīs organizācijas komiteja. Sava pieteikuma statusu varat sekot tabulā zemāk.",
       "openForm": "Atvērt pieteikuma formu",
@@ -372,7 +372,7 @@
       "deadline": "Termiņš",
       "notYetOpenMessage": "Reģistrācija vēl NAV ATVĒRTA",
       "notYetOpenDescription": "Pieteikuma forma būs pieejama no:",
-      "openingDate": "01.04.2026 00:00",
+      "openingDate": "01.04.2027 00:00",
       "closedMessage": "Reģistrācija pašlaik ir SLĒGTA",
       "closedDescription": "Pieteikuma termiņš ir beidzies. Lai pieteiktu savu komandu, lūdzam nosūtīt e-pastu uz:",
       "requiredInfo": "Jāiekļauj sekoja informācija: komandas nosaukums, dalībnieki (vārds, dzimšanas datums, loma), atbildīgā persona (vārds, tālrunis, e-pasts), vecuma grupa, izglītības iestāde un cita svarīga informācija.",

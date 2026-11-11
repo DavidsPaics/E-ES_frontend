@@ -1,10 +1,14 @@
 services:
   frontend:
+    image: ees-link-front:latest
     build:
       context: .
       dockerfile: Dockerfile
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://e-es.lv}
+    # Always build the image from source on `docker compose up`
+    # instead of reusing a previously built/loaded image.
+    pull_policy: build
     ports:
       - "8080:80"
     restart: unless-stopped

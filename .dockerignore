@@ -9,3 +9,6 @@ docker-compose.yml
 coverage
 .DS_Store
 Thumbs.db
+out
+dist.zip
+*.tar
